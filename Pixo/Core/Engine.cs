@@ -162,6 +162,8 @@ namespace Pixo.Core
                 _display.Invalidate();
                 _nextRender = DateTime.MinValue;
             }
+            if (_display.SetColorTune(_cfg.ColorSaturation, _cfg.ColorContrast, _cfg.ColorGamma))
+                _nextRender = DateTime.MinValue;
         }
 
         // ---------------- rotação ----------------

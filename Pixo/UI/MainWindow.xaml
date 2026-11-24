@@ -208,6 +208,49 @@
                                     <TextBlock Width="44" TextAlignment="Right" Text="{Binding Brightness, StringFormat={}{0:0}%}" VerticalAlignment="Center" />
                                 </StackPanel>
                             </ui:CardControl>
+                            <TextBlock Text="Cores da tela" Style="{StaticResource SectionTitle}" />
+                            <TextBlock Text="A tela física mostra cores mais apagadas que o monitor. Ajuste olhando para ela: a mudança aparece na hora." Style="{StaticResource RowHint}" Margin="0,0,0,8" />
+                            <ui:CardControl Style="{StaticResource Row}">
+                                <ui:CardControl.Header>
+                                    <StackPanel>
+                                        <TextBlock Text="Saturação" Style="{StaticResource RowTitle}" />
+                                        <TextBlock Text="Deixa as cores mais vivas" Style="{StaticResource RowHint}" />
+                                    </StackPanel>
+                                </ui:CardControl.Header>
+                                <StackPanel Orientation="Horizontal">
+                                    <Slider Width="200" Minimum="50" Maximum="200" Value="{Binding ColorSaturation}" IsSnapToTickEnabled="True" TickFrequency="5" IsMoveToPointEnabled="True" VerticalAlignment="Center" />
+                                    <TextBlock Width="52" TextAlignment="Right" Text="{Binding ColorSaturation, StringFormat={}{0:0}%}" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </ui:CardControl>
+                            <ui:CardControl Style="{StaticResource Row}">
+                                <ui:CardControl.Header>
+                                    <StackPanel>
+                                        <TextBlock Text="Contraste" Style="{StaticResource RowTitle}" />
+                                        <TextBlock Text="Pretos mais pretos e brancos mais brancos" Style="{StaticResource RowHint}" />
+                                    </StackPanel>
+                                </ui:CardControl.Header>
+                                <StackPanel Orientation="Horizontal">
+                                    <Slider Width="200" Minimum="50" Maximum="200" Value="{Binding ColorContrast}" IsSnapToTickEnabled="True" TickFrequency="2" IsMoveToPointEnabled="True" VerticalAlignment="Center" />
+                                    <TextBlock Width="52" TextAlignment="Right" Text="{Binding ColorContrast, StringFormat={}{0:0}%}" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </ui:CardControl>
+                            <ui:CardControl Style="{StaticResource Row}">
+                                <ui:CardControl.Header>
+                                    <StackPanel>
+                                        <TextBlock Text="Profundidade (gama)" Style="{StaticResource RowTitle}" />
+                                        <TextBlock Text="Acima de 100%: tons médios mais encorpados. Abaixo: mais claros" Style="{StaticResource RowHint}" />
+                                    </StackPanel>
+                                </ui:CardControl.Header>
+                                <StackPanel Orientation="Horizontal">
+                                    <Slider Width="200" Minimum="50" Maximum="200" Value="{Binding ColorGamma}" IsSnapToTickEnabled="True" TickFrequency="5" IsMoveToPointEnabled="True" VerticalAlignment="Center" />
+                                    <TextBlock Width="52" TextAlignment="Right" Text="{Binding ColorGamma, StringFormat={}{0:0}%}" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </ui:CardControl>
+                            <StackPanel Orientation="Horizontal" Margin="0,4,0,16">
+                                <ui:Button Content="Valores recomendados" Margin="0,0,8,0" Click="OnColorRecommended" />
+                                <ui:Button Content="Cores originais (100%)" Click="OnColorOriginal" />
+                            </StackPanel>
+
                             <ui:CardControl Style="{StaticResource Row}">
                                 <ui:CardControl.Header>
                                     <StackPanel>

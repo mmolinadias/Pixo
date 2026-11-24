@@ -118,12 +118,46 @@ namespace Pixo.Device
         /// <summary>Força o próximo quadro a ser enviado inteiro.</summary>
         public void Invalidate() => _last = null;
 
+        // ---------------- correção de cor ----------------
+
+        private readonly byte[] _lut = new byte[256];
+        private double _lutContrast = -1, _lutGamma = -1;
+        private int _satFixed = 256; // saturação em ponto fixo (256 = 1,0)
+
+        /// <summary>
+        /// Ajusta as cores para compensar o painel (que mostra cores lavadas).
+        /// saturation/contrast/gamma em porcentagem (100 = sem mudança).
+        /// </summary>
+        /// <returns>true se algo mudou (o próximo quadro vai inteiro).</returns>
+        public bool SetColorTune(double saturation, double contrast, double gamma)
+        {
+            int satFixed = (int)Math.Round(saturation / 100.0 * 256);
+            if (satFixed == _satFixed && contrast == _lutContrast && gamma == _lutGamma) return false;
+            _satFixed = satFixed;
+            _lutContrast = contrast; _lutGamma = gamma;
+            double c = contrast / 100.0, g = gamma / 100.0;
+            for (int i = 0; i < 256; i++)
+            {
+                double v = i / 255.0;
+                v = Math.Pow(v, g);                 // gama: >1 encorpa os tons médios
+                v = (v - 0.5) * c + 0.5;            // contraste em torno do cinza médio
+                _lut[i] = (byte)Math.Clamp((int)Math.Round(v * 255), 0, 255);
+            }
+            _last = null; // reenvia tudo com as cores novas
+            return true;
+        }
+
+        private bool TuneActive => _satFixed != 256 || _lutContrast != 100 || _lutGamma != 100;
+
         /// <summary>
         /// Envia um quadro 480×320 (BGRA, 4 bytes por pixel). Só o retângulo que mudou
         /// desde o último quadro é enviado. Devolve quantos pixels foram enviados.
         /// </summary>
         public int SendFrame(byte[] bgra, bool flipped)
         {
+            if (_lutContrast < 0) SetColorTune(100, 100, 100);
+            bool tune = TuneActive;
+            int sat = _satFixed;
             // 1) gira para o formato do painel (320×480) e converte para RGB565
             var px = new ushort[PanelW * PanelH];
             for (int py = 0; py < PanelH; py++)
@@ -135,6 +169,18 @@ namespace Pixo.Device
                     else { sx = W - 1 - py; sy = pxl; }                    // e no outro
                     int i = (sy * W + sx) * 4;
                     int b = bgra[i], g = bgra[i + 1], r = bgra[i + 2];
+                    if (tune)
+                    {
+                        // saturação: afasta cada canal do cinza (luminância) do pixel
+                        if (sat != 256)
+                        {
+                            int y = (r * 77 + g * 150 + b * 29) >> 8;
+                            r = Math.Clamp(y + (((r - y) * sat) >> 8), 0, 255);
+                            g = Math.Clamp(y + (((g - y) * sat) >> 8), 0, 255);
+                            b = Math.Clamp(y + (((b - y) * sat) >> 8), 0, 255);
+                        }
+                        r = _lut[r]; g = _lut[g]; b = _lut[b];
+                    }
                     px[py * PanelW + pxl] = (ushort)(((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3));
                 }
             }

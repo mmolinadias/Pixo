@@ -293,6 +293,20 @@ namespace Pixo.UI
 
         private void OnPortDropDown(object sender, EventArgs e) => FillPorts();
 
+        private void OnColorRecommended(object sender, RoutedEventArgs e)
+        {
+            _cfg.ColorSaturation = 140;
+            _cfg.ColorContrast = 104;
+            _cfg.ColorGamma = 100;
+        }
+
+        private void OnColorOriginal(object sender, RoutedEventArgs e)
+        {
+            _cfg.ColorSaturation = 100;
+            _cfg.ColorContrast = 100;
+            _cfg.ColorGamma = 100;
+        }
+
         // ---------------- Bichinho ----------------
 
         private void OnPetStateChanged(object sender, SelectionChangedEventArgs e)

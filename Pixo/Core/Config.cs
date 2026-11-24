@@ -45,6 +45,19 @@ namespace Pixo.Core
         /// <summary>false = Paisagem, true = Paisagem invertida.</summary>
         public bool Flipped { get => _flipped; set => Set(ref _flipped, value); }
 
+        // ---------------- Correção de cor (só na tela física) ----------------
+        private double _colorSaturation = 140;
+        /// <summary>100 = original. Acima disso, cores mais vivas.</summary>
+        public double ColorSaturation { get => _colorSaturation; set => Set(ref _colorSaturation, Math.Clamp(Math.Round(value), 50, 200)); }
+
+        private double _colorContrast = 104;
+        /// <summary>100 = original. Acima disso, pretos mais pretos e brancos mais brancos.</summary>
+        public double ColorContrast { get => _colorContrast; set => Set(ref _colorContrast, Math.Clamp(Math.Round(value), 50, 200)); }
+
+        private double _colorGamma = 100;
+        /// <summary>100 = original. Acima disso, tons médios mais escuros e encorpados.</summary>
+        public double ColorGamma { get => _colorGamma; set => Set(ref _colorGamma, Math.Clamp(Math.Round(value), 50, 200)); }
+
         // ---------------- Rotação ----------------
         private double _secondsPerScreen = 15;
         public double SecondsPerScreen { get => _secondsPerScreen; set => Set(ref _secondsPerScreen, Math.Clamp(Math.Round(value), 5, 300)); }
