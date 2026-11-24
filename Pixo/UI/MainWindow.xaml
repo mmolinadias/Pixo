@@ -1,0 +1,452 @@
+<ui:FluentWindow x:Class="Pixo.UI.MainWindow"
+                 xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                 xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+                 xmlns:local="clr-namespace:Pixo.UI"
+                 Title="Pixo" Width="900" Height="600" MinWidth="760" MinHeight="520"
+                 WindowStartupLocation="CenterScreen"
+                 ExtendsContentIntoTitleBar="True"
+                 WindowBackdropType="Mica"
+                 WindowCornerPreference="Round">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <ui:TitleBar Grid.Row="0" Title="Pixo" />
+
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="232" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <!-- ======================= navegação ======================= -->
+            <DockPanel Grid.Column="0" Margin="12,4,8,12">
+                <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="8,4,0,16">
+                    <Image x:Name="NavLogo" Width="32" Height="32" Margin="0,0,10,0" />
+                    <TextBlock Text="pixo" FontSize="22" FontWeight="ExtraBold" VerticalAlignment="Center" />
+                </StackPanel>
+                <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="12,8,0,0">
+                    <Ellipse x:Name="NavDot" Width="8" Height="8" Margin="0,0,8,0" VerticalAlignment="Center" />
+                    <TextBlock x:Name="NavStatus" FontSize="12" Foreground="{StaticResource PixoText2}" />
+                </StackPanel>
+                <ListBox x:Name="Nav" SelectionChanged="OnNavChanged" BorderThickness="0" Background="Transparent">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel Orientation="Horizontal" Margin="4,6">
+                                <local:PixoIcon Kind="{Binding Icon}" Width="18" Height="18" Margin="0,0,12,0" />
+                                <TextBlock Text="{Binding Title}" FontSize="14" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </DockPanel>
+
+            <!-- ======================= páginas ======================= -->
+            <Border Grid.Column="1" Background="#0Dffffff" CornerRadius="8,0,0,0" BorderBrush="{StaticResource PixoStroke}" BorderThickness="1,1,0,0">
+                <ScrollViewer x:Name="PageScroll" VerticalScrollBarVisibility="Auto" Padding="32,24,32,24">
+                    <Grid MaxWidth="720" HorizontalAlignment="Stretch">
+
+                        <!-- ===== Início ===== -->
+                        <StackPanel x:Name="PageHome">
+                            <TextBlock Text="Início" Style="{StaticResource PageTitle}" />
+                            <TextBlock Text="O que está na sua tela agora e os controles rápidos." Style="{StaticResource PageSubtitle}" />
+
+                            <ui:InfoBar x:Name="WelcomeBar" Title="Bem-vindo ao Pixo!" IsOpen="False" Severity="Informational" IsClosable="True" Margin="0,0,0,12"
+                                        Message="Feche o programa que veio com a tela (UsbMonitor) para o Pixo conseguir usar a tela. Depois, escolha as telas na aba Telas e configure a voz na aba Voz." />
+                            <ui:InfoBar x:Name="StatusBar" IsOpen="False" Severity="Warning" IsClosable="False" Margin="0,0,0,12" />
+
+                            <Border HorizontalAlignment="Left" CornerRadius="12" Background="{StaticResource PixoDisplayBg}"
+                                    BorderBrush="{StaticResource PixoStroke}" BorderThickness="1" Padding="0">
+                                <Image x:Name="PreviewImage" Width="480" Height="320" RenderOptions.BitmapScalingMode="HighQuality">
+                                    <Image.Clip>
+                                        <RectangleGeometry Rect="0,0,480,320" RadiusX="12" RadiusY="12" />
+                                    </Image.Clip>
+                                </Image>
+                            </Border>
+
+                            <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                                <ui:Button Click="OnPrev" Margin="0,0,8,0" Padding="14,8">
+                                    <StackPanel Orientation="Horizontal">
+                                        <local:PixoIcon Kind="prev" Width="16" Height="16" Margin="0,0,8,0" />
+                                        <TextBlock Text="Anterior" />
+                                    </StackPanel>
+                                </ui:Button>
+                                <ui:Button x:Name="PauseBtn" Click="OnPause" Margin="0,0,8,0" Padding="14,8">
+                                    <StackPanel Orientation="Horizontal">
+                                        <local:PixoIcon x:Name="PauseBtnIcon" Kind="pause" Width="16" Height="16" Margin="0,0,8,0" />
+                                        <TextBlock x:Name="PauseBtnText" Text="Pausar rotação" />
+                                    </StackPanel>
+                                </ui:Button>
+                                <ui:Button Click="OnNext" Padding="14,8">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="Próxima" />
+                                        <local:PixoIcon Kind="next" Width="16" Height="16" Margin="8,0,0,0" />
+                                    </StackPanel>
+                                </ui:Button>
+                            </StackPanel>
+
+                            <TextBlock Text="Tela" Style="{StaticResource SectionTitle}" />
+                            <ui:CardControl Style="{StaticResource Row}">
+                                <ui:CardControl.Header>
+                                    <StackPanel>
+                                        <TextBlock x:Name="HomeConn" Style="{StaticResource RowTitle}" />
+                                        <TextBlock x:Name="HomeScreen" Style="{StaticResource RowHint}" />
+                                    </StackPanel>
+                                </ui:CardControl.Header>
+                                <ui:Button Content="Reconectar" Click="OnReconnect" />
+                            </ui:CardControl>
+                            <ui:CardControl Style="{StaticResource Row}">
+                                <ui:CardControl.Header>
+                                    <StackPanel>
+                                        <TextBlock Text="Brilho" Style="{StaticResource RowTitle}" />
+                                        <TextBlock Text="Quanto a tela acende" Style="{StaticResource RowHint}" />
+                                    </StackPanel>
+                                </ui:CardControl.Header>
+                                <StackPanel Orientation="Horizontal">
+                                    <Slider Width="200" Minimum="0" Maximum="100" Value="{Binding Brightness}" IsMoveToPointEnabled="True" VerticalAlignment="Center" />
+                                    <TextBlock Width="44" TextAlignment="Right" Text="{Binding Brightness, StringFormat={}{0:0}%}" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </ui:CardControl>
+                        </StackPanel>
+
+                        <!-- ===== Telas ===== -->
+                        <StackPanel x:Name="PageScreens" Visibility="Collapsed">
+                            <TextBlock Text="Telas" Style="{StaticResource PageTitle}" />
+                            <TextBlock Text="Escolha as telas que entram no rodízio e a ordem delas. Telas sem nada para mostrar são puladas sozinhas." Style="{StaticResource PageSubtitle}" />
+
+                            <ItemsControl x:Name="ScreenList">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <ui:CardControl Style="{StaticResource Row}">
+                                            <ui:CardControl.Header>
+                                                <StackPanel Orientation="Horizontal">
+                                                    <local:PixoIcon Kind="{Binding Icon}" Width="20" Height="20" Margin="0,0,14,0" VerticalAlignment="Center" />
+                                                    <StackPanel>
+                                                        <TextBlock Text="{Binding Name}" Style="{StaticResource RowTitle}" />
+                                                        <TextBlock Text="{Binding Hint}" Style="{StaticResource RowHint}" />
+                                                    </StackPanel>
+                                                </StackPanel>
+                                            </ui:CardControl.Header>
+                                            <StackPanel Orientation="Horizontal">
+                                                <ui:Button Appearance="Transparent" Padding="6" Margin="0,0,2,0" Tag="{Binding}" Click="OnScreenUp" ToolTip="Subir">
+                                                    <local:PixoIcon Kind="arrowUp" Width="16" Height="16" />
+                                                </ui:Button>
+                                                <ui:Button Appearance="Transparent" Padding="6" Margin="0,0,12,0" Tag="{Binding}" Click="OnScreenDown" ToolTip="Descer">
+                                                    <local:PixoIcon Kind="arrowDown" Width="16" Height="16" />
+                                                </ui:Button>
+                                                <ui:ToggleSwitch IsChecked="{Binding Enabled, Mode=TwoWay}" Checked="OnScreenToggled" Unchecked="OnScreenToggled" />
+                                            </StackPanel>
+                                        </ui:CardControl>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+
+                            <TextBlock Text="Rodízio" Style="{StaticResource SectionTitle}" />
+                            <ui:CardControl Style="{StaticResource Row}">
+                                <ui:CardControl.Header>
+                                    <StackPanel>
+                                        <TextBlock Text="Tempo em cada tela" Style="{StaticResource RowTitle}" />
+                                        <TextBlock Text="Quanto tempo cada tela fica antes de passar para a próxima" Style="{StaticResource RowHint}" />
+                                    </StackPanel>
+                                </ui:CardControl.Header>
+                                <StackPanel Orientation="Horizontal">
+                                    <Slider Width="200" Minimum="5" Maximum="120" Value="{Binding SecondsPerScreen}" IsSnapToTickEnabled="True" TickFrequency="5" IsMoveToPointEnabled="True" VerticalAlignment="Center" />
+                                    <TextBlock Width="52" TextAlignment="Right" Text="{Binding SecondsPerScreen, StringFormat={}{0:0} s}" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </ui:CardControl>
+                            <ui:CardControl Style="{StaticResource Row}">
+                                <ui:CardControl.Header>
+                                    <StackPanel>
+                                        <TextBlock Text="Depois de um comando de voz" Style="{StaticResource RowTitle}" />
+                                        <TextBlock Text="A tela que você pediu fica parada por este tempo" Style="{StaticResource RowHint}" />
+                                    </StackPanel>
+                                </ui:CardControl.Header>
+                                <StackPanel Orientation="Horizontal">
+                                    <Slider Width="200" Minimum="0" Maximum="300" Value="{Binding PauseAfterVoice}" IsSnapToTickEnabled="True" TickFrequency="10" IsMoveToPointEnabled="True" VerticalAlignment="Center" />
+                                    <TextBlock Width="52" TextAlignment="Right" Text="{Binding PauseAfterVoice, StringFormat={}{0:0} s}" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </ui:CardControl>
+                            <ui:CardControl Style="{StaticResource Row}">
+                                <ui:CardControl.Header>
+                                    <StackPanel>
+                                        <TextBlock Text="Música só do Spotify" Style="{StaticResource RowTitle}" />
+                                        <TextBlock Text="Desligado: mostra o que tocar em qualquer app (YouTube, Deezer, players...)" Style="{StaticResource RowHint}" />
+                                    </StackPanel>
+                                </ui:CardControl.Header>
+                                <ui:ToggleSwitch IsChecked="{Binding OnlySpotify}" />
+                            </ui:CardControl>
+                        </StackPanel>
+
+                        <!-- ===== Tela física ===== -->
+                        <StackPanel x:Name="PageDevice" Visibility="Collapsed">
+                            <TextBlock Text="Tela física" Style="{StaticResource PageTitle}" />
+                            <TextBlock Text="Como a tela está na sua mesa e como o Pixo conversa com ela." Style="{StaticResource PageSubtitle}" />
+                            <ui:CardControl Style="{StaticResource Row}">
+                                <ui:CardControl.Header>
+                                    <StackPanel>
+                                        <TextBlock Text="Orientação" Style="{StaticResource RowTitle}" />
+                                        <TextBlock Text="Se a imagem aparecer de cabeça para baixo, troque aqui" Style="{StaticResource RowHint}" />
+                                    </StackPanel>
+                                </ui:CardControl.Header>
+                                <ComboBox x:Name="OrientationBox" Width="200" SelectionChanged="OnOrientationChanged">
+                                    <ComboBoxItem Content="Paisagem" />
+                                    <ComboBoxItem Content="Paisagem invertida" />
+                                </ComboBox>
+                            </ui:CardControl>
+                            <ui:CardControl Style="{StaticResource Row}">
+                                <ui:CardControl.Header>
+                                    <StackPanel>
+                                        <TextBlock Text="Brilho" Style="{StaticResource RowTitle}" />
+                                        <TextBlock Text="Quanto a tela acende" Style="{StaticResource RowHint}" />
+                                    </StackPanel>
+                                </ui:CardControl.Header>
+                                <StackPanel Orientation="Horizontal">
+                                    <Slider Width="200" Minimum="0" Maximum="100" Value="{Binding Brightness}" IsMoveToPointEnabled="True" VerticalAlignment="Center" />
+                                    <TextBlock Width="44" TextAlignment="Right" Text="{Binding Brightness, StringFormat={}{0:0}%}" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </ui:CardControl>
+                            <ui:CardControl Style="{StaticResource Row}">
+                                <ui:CardControl.Header>
+                                    <StackPanel>
+                                        <TextBlock Text="Porta" Style="{StaticResource RowTitle}" />
+                                        <TextBlock Text="Deixe em Automático. Só mude se a tela não for encontrada" Style="{StaticResource RowHint}" />
+                                    </StackPanel>
+                                </ui:CardControl.Header>
+                                <StackPanel Orientation="Horizontal">
+                                    <ComboBox x:Name="PortBox" Width="160" IsEditable="True" Text="{Binding Port, UpdateSourceTrigger=LostFocus}" DropDownOpened="OnPortDropDown" />
+                                    <ui:Button Content="Reconectar" Margin="8,0,0,0" Click="OnReconnect" />
+                                </StackPanel>
+                            </ui:CardControl>
+                            <ui:InfoBar Title="Dica" IsOpen="True" IsClosable="False" Severity="Informational" Margin="0,12,0,0"
+                                        Message="A tela não pode ser usada por dois programas ao mesmo tempo. Feche o UsbMonitor e tire ele da inicialização do Windows." />
+                        </StackPanel>
+
+                        <!-- ===== Bichinho ===== -->
+                        <StackPanel x:Name="PagePet" Visibility="Collapsed">
+                            <TextBlock Text="Bichinho" Style="{StaticResource PageTitle}" />
+                            <TextBlock Text="O Bit reage ao seu PC: fica feliz, ocupado, com calor, dorme, joga, dança e comemora." Style="{StaticResource PageSubtitle}" />
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                                <Border CornerRadius="12" Background="{StaticResource PixoDisplayBg}" BorderBrush="{StaticResource PixoStroke}" BorderThickness="1">
+                                    <Image x:Name="PetPreview" Width="180" Height="180" />
+                                </Border>
+                                <StackPanel Margin="20,0,0,0" VerticalAlignment="Center">
+                                    <TextBlock Text="Prévia" Style="{StaticResource RowTitle}" />
+                                    <TextBlock x:Name="PetPreviewHint" Text="Mostrando o humor de agora" Style="{StaticResource RowHint}" Margin="0,2,0,8" />
+                                    <ComboBox x:Name="PetStateBox" Width="240" SelectionChanged="OnPetStateChanged" />
+                                </StackPanel>
+                            </StackPanel>
+                            <ui:CardControl Style="{StaticResource Row}">
+                                <ui:CardControl.Header>
+                                    <StackPanel>
+                                        <TextBlock Text="Nome" Style="{StaticResource RowTitle}" />
+                                        <TextBlock Text="Como o bichinho se chama" Style="{StaticResource RowHint}" />
+                                    </StackPanel>
+                                </ui:CardControl.Header>
+                                <TextBox Width="200" Text="{Binding PetName, UpdateSourceTrigger=PropertyChanged}" MaxLength="14" />
+                            </ui:CardControl>
+                            <ui:CardControl Style="{StaticResource Row}">
+                                <ui:CardControl.Header>
+                                    <StackPanel>
+                                        <TextBlock Text="Hora de dormir" Style="{StaticResource RowTitle}" />
+                                        <TextBlock Text="Ele dorme depois deste tempo sem você mexer no PC" Style="{StaticResource RowHint}" />
+                                    </StackPanel>
+                                </ui:CardControl.Header>
+                                <StackPanel Orientation="Horizontal">
+                                    <Slider Width="200" Minimum="1" Maximum="60" Value="{Binding PetSleepMinutes}" IsSnapToTickEnabled="True" TickFrequency="1" IsMoveToPointEnabled="True" VerticalAlignment="Center" />
+                                    <TextBlock Width="60" TextAlignment="Right" Text="{Binding PetSleepMinutes, StringFormat={}{0:0} min}" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </ui:CardControl>
+                        </StackPanel>
+
+                        <!-- ===== Voz ===== -->
+                        <StackPanel x:Name="PageVoice" Visibility="Collapsed">
+                            <TextBlock Text="Voz" Style="{StaticResource PageTitle}" />
+                            <TextBlock Text="Fale com a tela, em português e sem internet. Ex.: &quot;temperatura&quot;, &quot;música&quot;, &quot;próxima&quot;." Style="{StaticResource PageSubtitle}" />
+                            <ui:CardControl Style="{StaticResource Row}">
+                                <ui:CardControl.Header>
+                                    <StackPanel Orientation="Horizontal">
+                                        <local:PixoIcon x:Name="MicIcon" Kind="mic" Width="20" Height="20" Margin="0,0,14,0" VerticalAlignment="Center" />
+                                        <StackPanel>
+                                            <TextBlock x:Name="VoiceStatus" Text="Desligado" Style="{StaticResource RowTitle}" />
+                                            <TextBlock x:Name="VoiceHeard" Text="Nenhuma frase reconhecida ainda" Style="{StaticResource RowHint}" />
+                                        </StackPanel>
+                                    </StackPanel>
+                                </ui:CardControl.Header>
+                                <ui:ToggleSwitch IsChecked="{Binding VoiceEnabled}" Checked="OnVoiceToggled" Unchecked="OnVoiceToggled" />
+                            </ui:CardControl>
+                            <ui:CardControl Style="{StaticResource Row}">
+                                <ui:CardControl.Header>
+                                    <StackPanel>
+                                        <TextBlock Text="Microfone" Style="{StaticResource RowTitle}" />
+                                        <TextBlock Text="Fale algo: a barra deve se mexer. Se não mexer, escolha outro microfone" Style="{StaticResource RowHint}" />
+                                        <ProgressBar x:Name="MicLevel" Minimum="0" Maximum="100" Height="6" Width="260" HorizontalAlignment="Left" Margin="0,8,0,0" />
+                                        <TextBlock x:Name="VoiceRaw" Margin="0,6,0,0" FontSize="12" Foreground="{StaticResource PixoText2}" TextTrimming="CharacterEllipsis" MaxWidth="360" Text="Entendendo: —" />
+                                    </StackPanel>
+                                </ui:CardControl.Header>
+                                <ComboBox x:Name="MicBox" Width="240" DisplayMemberPath="Name" SelectedValuePath="Id" SelectionChanged="OnMicChanged" DropDownOpened="OnMicDropDown" />
+                            </ui:CardControl>
+                            <ui:CardControl Style="{StaticResource Row}">
+                                <ui:CardControl.Header>
+                                    <StackPanel>
+                                        <TextBlock Text="Modelo de voz" Style="{StaticResource RowTitle}" />
+                                        <TextBlock Text="Baixe o vosk-model-small-pt, descompacte e escolha a pasta dele" Style="{StaticResource RowHint}" />
+                                    </StackPanel>
+                                </ui:CardControl.Header>
+                                <StackPanel Orientation="Horizontal">
+                                    <ui:Button Content="Baixar modelo" Margin="0,0,8,0" Click="OnModelSite" />
+                                    <ui:Button Content="Escolher pasta" Appearance="Primary" Click="OnPickModel" />
+                                </StackPanel>
+                            </ui:CardControl>
+                            <TextBlock x:Name="ModelPathText" Margin="16,0,0,4" FontSize="12" Foreground="{StaticResource PixoText3}" TextTrimming="CharacterEllipsis" />
+
+                            <TextBlock Text="Comandos" Style="{StaticResource SectionTitle}" />
+                            <DataGrid x:Name="VoiceGrid" AutoGenerateColumns="False" CanUserAddRows="False" HeadersVisibility="Column"
+                                      MaxHeight="320" CanUserResizeRows="False" SelectionMode="Single" CellEditEnding="OnVoiceEdited">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="Você fala" Binding="{Binding Phrase, UpdateSourceTrigger=PropertyChanged}" Width="*" />
+                                    <DataGridComboBoxColumn x:Name="ActionColumn" Header="O Pixo faz" Width="*"
+                                                            SelectedValuePath="Id" DisplayMemberPath="Name"
+                                                            SelectedValueBinding="{Binding Action, UpdateSourceTrigger=PropertyChanged}" />
+                                </DataGrid.Columns>
+                            </DataGrid>
+                            <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                <ui:Button Content="Adicionar" Margin="0,0,8,0" Click="OnVoiceAdd" />
+                                <ui:Button Content="Remover" Margin="0,0,8,0" Click="OnVoiceRemove" />
+                                <ui:Button Content="Restaurar padrão" Margin="0,0,8,0" Click="OnVoiceReset" />
+                                <ui:Button Content="Aplicar" Appearance="Primary" Click="OnVoiceApply" />
+                            </StackPanel>
+                            <TextBlock Margin="0,8,0,0" FontSize="12" Foreground="{StaticResource PixoText3}" TextWrapping="Wrap"
+                                       Text="Use palavras comuns do português. Palavras que o modelo não conhece são ignoradas." />
+                        </StackPanel>
+
+                        <!-- ===== Jogos ===== -->
+                        <StackPanel x:Name="PageGames" Visibility="Collapsed">
+                            <TextBlock Text="Jogos" Style="{StaticResource PageTitle}" />
+                            <TextBlock Text="Quando você abre um jogo, a tela entra sozinha no Modo Gamer e volta quando você sai." Style="{StaticResource PageSubtitle}" />
+                            <ui:CardControl Style="{StaticResource Row}">
+                                <ui:CardControl.Header>
+                                    <StackPanel>
+                                        <TextBlock Text="Modo Gamer automático" Style="{StaticResource RowTitle}" />
+                                        <TextBlock Text="Detecta jogos da Steam, Epic, Riot, GOG, Xbox, EA, Ubisoft e Battle.net" Style="{StaticResource RowHint}" />
+                                    </StackPanel>
+                                </ui:CardControl.Header>
+                                <ui:ToggleSwitch IsChecked="{Binding GameModeAuto}" />
+                            </ui:CardControl>
+                            <TextBlock Text="Outros jogos" Style="{StaticResource SectionTitle}" />
+                            <TextBlock Text="Se algum jogo não for detectado, escreva o nome do .exe dele aqui (um por linha)." Style="{StaticResource RowHint}" Margin="0,0,0,8" />
+                            <TextBox Text="{Binding ExtraGames, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" MinHeight="100" TextWrapping="NoWrap" VerticalScrollBarVisibility="Auto" />
+                            <ui:InfoBar Title="Para ver o FPS" IsOpen="True" IsClosable="False" Severity="Informational" Margin="0,12,0,0"
+                                        Message="Instale o MSI Afterburner (ele vem com o RivaTuner Statistics Server) e deixe o RivaTuner aberto enquanto joga." />
+                        </StackPanel>
+
+                        <!-- ===== Downloads ===== -->
+                        <StackPanel x:Name="PageDownloads" Visibility="Collapsed">
+                            <TextBlock Text="Downloads" Style="{StaticResource PageTitle}" />
+                            <TextBlock Text="Steam, navegador e qBittorrent aparecem na tela enquanto estiverem baixando." Style="{StaticResource PageSubtitle}" />
+                            <ui:CardControl Style="{StaticResource Row}">
+                                <ui:CardControl.Header>
+                                    <StackPanel>
+                                        <TextBlock Text="Pasta de downloads do navegador" Style="{StaticResource RowTitle}" />
+                                        <TextBlock x:Name="DownloadsPathText" Style="{StaticResource RowHint}" />
+                                    </StackPanel>
+                                </ui:CardControl.Header>
+                                <ui:Button Content="Escolher pasta" Click="OnPickDownloads" />
+                            </ui:CardControl>
+                            <ui:CardControl Style="{StaticResource Row}">
+                                <ui:CardControl.Header>
+                                    <StackPanel>
+                                        <TextBlock Text="Endereço do qBittorrent" Style="{StaticResource RowTitle}" />
+                                        <TextBlock Text="No qBittorrent: Ferramentas › Opções › Interface Web. Ative e marque &quot;Ignorar autenticação para clientes no localhost&quot;" Style="{StaticResource RowHint}" MaxWidth="360" />
+                                    </StackPanel>
+                                </ui:CardControl.Header>
+                                <TextBox Width="220" Text="{Binding QBittorrentUrl, UpdateSourceTrigger=LostFocus}" />
+                            </ui:CardControl>
+                        </StackPanel>
+
+                        <!-- ===== Imagens ===== -->
+                        <StackPanel x:Name="PageImages" Visibility="Collapsed">
+                            <TextBlock Text="Imagens" Style="{StaticResource PageTitle}" />
+                            <TextBlock Text="A tela Imagem mostra uma foto por vez e troca a cada volta do rodízio." Style="{StaticResource PageSubtitle}" />
+                            <ui:CardControl Style="{StaticResource Row}">
+                                <ui:CardControl.Header>
+                                    <StackPanel>
+                                        <TextBlock Text="Pasta das imagens" Style="{StaticResource RowTitle}" />
+                                        <TextBlock x:Name="ImagesPathText" Style="{StaticResource RowHint}" />
+                                    </StackPanel>
+                                </ui:CardControl.Header>
+                                <StackPanel Orientation="Horizontal">
+                                    <ui:Button Content="Abrir pasta" Margin="0,0,8,0" Click="OnOpenImages" />
+                                    <ui:Button Content="Escolher pasta" Appearance="Primary" Click="OnPickImages" />
+                                </StackPanel>
+                            </ui:CardControl>
+                            <ui:CardControl Style="{StaticResource Row}">
+                                <ui:CardControl.Header>
+                                    <StackPanel>
+                                        <TextBlock Text="Preencher a tela" Style="{StaticResource RowTitle}" />
+                                        <TextBlock Text="Ligado: a foto ocupa a tela toda (corta as bordas). Desligado: aparece inteira" Style="{StaticResource RowHint}" />
+                                    </StackPanel>
+                                </ui:CardControl.Header>
+                                <ui:ToggleSwitch IsChecked="{Binding ImageFill}" />
+                            </ui:CardControl>
+                            <TextBlock Text="Na pasta" Style="{StaticResource SectionTitle}" />
+                            <TextBlock x:Name="ImagesEmpty" Text="Nenhuma imagem ainda." Style="{StaticResource RowHint}" />
+                            <ItemsControl x:Name="ImageThumbs">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <WrapPanel />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Margin="0,0,8,8" CornerRadius="8" BorderBrush="{StaticResource PixoStroke}" BorderThickness="1" ClipToBounds="True">
+                                            <Image Source="{Binding}" Width="120" Height="80" Stretch="UniformToFill" />
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+
+                        <!-- ===== Geral ===== -->
+                        <StackPanel x:Name="PageGeneral" Visibility="Collapsed">
+                            <TextBlock Text="Geral" Style="{StaticResource PageTitle}" />
+                            <TextBlock Text="Inicialização e informações do Pixo." Style="{StaticResource PageSubtitle}" />
+                            <ui:CardControl Style="{StaticResource Row}">
+                                <ui:CardControl.Header>
+                                    <StackPanel>
+                                        <TextBlock Text="Iniciar com o Windows" Style="{StaticResource RowTitle}" />
+                                        <TextBlock Text="O Pixo abre sozinho, minimizado na bandeja, quando você entra no Windows" Style="{StaticResource RowHint}" />
+                                    </StackPanel>
+                                </ui:CardControl.Header>
+                                <ui:ToggleSwitch x:Name="StartupSwitch" Click="OnStartupToggled" />
+                            </ui:CardControl>
+                            <ui:CardControl Style="{StaticResource Row}">
+                                <ui:CardControl.Header>
+                                    <StackPanel>
+                                        <TextBlock Text="Pasta de configurações" Style="{StaticResource RowTitle}" />
+                                        <TextBlock Text="Onde o Pixo guarda as suas escolhas" Style="{StaticResource RowHint}" />
+                                    </StackPanel>
+                                </ui:CardControl.Header>
+                                <ui:Button Content="Abrir" Click="OnOpenConfigFolder" />
+                            </ui:CardControl>
+                            <ui:CardControl Style="{StaticResource Row}">
+                                <ui:CardControl.Header>
+                                    <StackPanel Orientation="Horizontal">
+                                        <Image x:Name="AboutLogo" Width="40" Height="40" Margin="0,0,14,0" />
+                                        <StackPanel VerticalAlignment="Center">
+                                            <TextBlock Text="Pixo 1.0" Style="{StaticResource RowTitle}" />
+                                            <TextBlock Text="Para a Turing Smart Screen 3,5&quot;. Feito com carinho pelo Bit." Style="{StaticResource RowHint}" />
+                                        </StackPanel>
+                                    </StackPanel>
+                                </ui:CardControl.Header>
+                            </ui:CardControl>
+                        </StackPanel>
+
+                    </Grid>
+                </ScrollViewer>
+            </Border>
+        </Grid>
+    </Grid>
+</ui:FluentWindow>
