@@ -132,11 +132,18 @@ namespace Pixo.Render
             // chip Tocando / Pausado
             double chipW = D.Chip(dc, m.Playing ? "Tocando" : "Pausado", 200, 184, 28, Pal.Ink, Pal.Bg, 13, 700, 12, m.Playing ? "play" : "pause");
 
-            // app de origem (slot com a cor da marca + inicial)
+            // app de origem: ícone oficial do Windows; sem ele, o "slot" com a cor da marca + inicial
             double ax = Math.Max(300, 200 + chipW + 12);
-            var appColor = Pal.ForName(m.App);
-            dc.DrawEllipse(appColor, null, new Point(ax + 8, 198), 8, 8);
-            D.Text(dc, m.App.Substring(0, 1).ToUpper(), ax, 190, 16, 16, 11, 800, Pal.Bg, Align.Center);
+            if (m.AppIcon != null)
+            {
+                dc.DrawImage(m.AppIcon, new Rect(ax, 190, 16, 16));
+            }
+            else
+            {
+                var appColor = Pal.ForName(m.App);
+                dc.DrawEllipse(appColor, null, new Point(ax + 8, 198), 8, 8);
+                D.Text(dc, m.App.Substring(0, 1).ToUpper(), ax, 190, 16, 16, 11, 800, Pal.Bg, Align.Center);
+            }
             D.Text(dc, m.App, ax + 22, 190, 464 - ax - 22, 16, 12, 600, Pal.Ink2);
 
             // progresso
@@ -331,7 +338,7 @@ namespace Pixo.Render
             D.Card(dc, px, py, 216, 260, Pal.GamerSurface, gcardBorder);
             D.Text(dc, "FPS", px + 16, py + 14, 60, 16, 13, 700, Pal.Gamer);
             D.Text(dc, fps == null ? "--" : D.N0(fps.Value), px, py + 52, 216, 96, 96, 800, fc, Align.Center);
-            string sub = fps == null ? "Abra o RivaTuner para ver o FPS"
+            string sub = fps == null ? "Jogue em tela cheia para ver o FPS"
                 : "mín. " + (game.MinFps != null ? D.N0(game.MinFps.Value) : "--") + " · " + (game.FrameMs != null ? D.N1(game.FrameMs.Value) : "--") + " ms";
             D.Text(dc, sub, px, py + 156, 216, 16, 13, 600, Pal.Ink2, Align.Center);
 

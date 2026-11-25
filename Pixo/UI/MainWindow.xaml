@@ -381,8 +381,8 @@
                             <TextBlock Text="Outros jogos" Style="{StaticResource SectionTitle}" />
                             <TextBlock Text="Se algum jogo não for detectado, escreva o nome do .exe dele aqui (um por linha)." Style="{StaticResource RowHint}" Margin="0,0,0,8" />
                             <TextBox Text="{Binding ExtraGames, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" MinHeight="100" TextWrapping="NoWrap" VerticalScrollBarVisibility="Auto" />
-                            <ui:InfoBar Title="Para ver o FPS" IsOpen="True" IsClosable="False" Severity="Informational" Margin="0,12,0,0"
-                                        Message="Instale o MSI Afterburner (ele vem com o RivaTuner Statistics Server) e deixe o RivaTuner aberto enquanto joga." />
+                            <ui:InfoBar Title="Sobre o FPS" IsOpen="True" IsClosable="False" Severity="Informational" Margin="0,12,0,0"
+                                        Message="O FPS vem direto da sua placa de vídeo, sem precisar de outro programa. Ele aparece com o jogo em tela cheia. Se o RivaTuner estiver aberto, o Pixo usa ele como reserva." />
                         </StackPanel>
 
                         <!-- ===== Downloads ===== -->

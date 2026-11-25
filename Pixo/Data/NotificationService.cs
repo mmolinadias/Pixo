@@ -103,6 +103,22 @@ namespace Pixo.Data
         {
             lock (Logos) if (Logos.TryGetValue(app, out var cached)) return cached;
             BitmapSource bmp = null;
+
+            // 1) ícone oficial pelo Windows Shell (funciona com programas comuns, como Claude e Discord)
+            try
+            {
+                string aumid = null;
+                try { aumid = n.AppInfo?.AppUserModelId; } catch { }
+                bmp = AppIcons.Get(aumid);
+            }
+            catch { }
+            if (bmp != null)
+            {
+                lock (Logos) Logos[app] = bmp;
+                return bmp;
+            }
+
+            // 2) logo do pacote (apps da Microsoft Store)
             try
             {
                 var reference = n.AppInfo?.DisplayInfo?.GetLogo(new Windows.Foundation.Size(64, 64));

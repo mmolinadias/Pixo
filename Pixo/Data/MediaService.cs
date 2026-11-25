@@ -18,6 +18,7 @@ namespace Pixo.Data
         public DateTimeOffset UpdatedAt;
         public BitmapSource Cover;      // capa
         public BitmapSource CoverTiny;  // capa reduzida (vira o fundo desfocado)
+        public BitmapSource AppIcon;    // ícone oficial do app que está tocando (pode ser null)
 
         /// <summary>Posição estimada agora (o Windows só atualiza de vez em quando).</summary>
         public TimeSpan PositionNow
@@ -126,6 +127,7 @@ namespace Pixo.Data
             }
             np.Cover = _cover;
             np.CoverTiny = _coverTiny;
+            np.AppIcon = AppIcons.Get(np.AppKey);
             return np;
         }
 

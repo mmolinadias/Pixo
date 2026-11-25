@@ -15,6 +15,7 @@ namespace Pixo.Data
         public double? Load;
         public double? VramUsedGb;
         public double? VramTotalGb;
+        public double? Fps;      // FPS informado pelo driver da placa de vídeo (AMD: "Fullscreen FPS")
     }
 
     public class HwSnapshot
@@ -46,7 +47,7 @@ namespace Pixo.Data
 
         public static void Start()
         {
-            _timer = new Timer(_ => Update(), null, 0, 2000);
+            _timer = new Timer(_ => Update(), null, 0, 1000);
         }
 
         public static void Stop()
@@ -106,7 +107,8 @@ namespace Pixo.Data
                                 Temp = Pick(sensors, SensorType.Temperature, GpuPreferred),
                                 Load = Value(sensors, SensorType.Load, "GPU Core"),
                                 VramUsedGb = used / 1024,
-                                VramTotalGb = total / 1024
+                                VramTotalGb = total / 1024,
+                                Fps = Value(sensors, SensorType.Factor, "Fullscreen FPS")
                             };
                             // prefere a placa de vídeo dedicada à integrada
                             if (hw.HardwareType == HardwareType.GpuIntel) intelGpu ??= gpu;

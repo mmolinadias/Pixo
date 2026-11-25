@@ -66,13 +66,25 @@ namespace Pixo.Data
             if (NotGames.Any(n => file.Contains(n))) return null;
 
             var rtss = ReadRtss();
-            rtss.TryGetValue(pid, out var r);
+            var r = rtss.FirstOrDefault(e => e.Pid == pid);
+            // o jogo pode desenhar por outro processo (launcher, processo filho):
+            // nesse caso usa a entrada do RivaTuner que está ativa agora
+            if (r.Fps <= 0)
+                r = rtss.Where(e => e.Fps > 0 && e.Active).OrderByDescending(e => e.Fps).FirstOrDefault();
+
+            // reserva: sensor de FPS da própria placa de vídeo (AMD informa "Fullscreen FPS")
+            double? gpuFps = HardwareService.Current?.Gpu?.Fps;
+
             bool isGame = GameFolders.Any(g => path.Contains(g))
                           || (_cfg?.Invoke()?.ExtraGamesList().Contains(file) ?? false)
-                          || r.fps > 0;
+                          || r.Fps > 0
+                          || gpuFps > 0;
+            WriteDiag(pid, exe, isGame, rtss, gpuFps);
             if (!isGame) return null;
 
-            double? fps = r.fps > 0 ? r.fps : (double?)null;
+            // principal: sensor da placa de vídeo; reserva: RivaTuner
+            double? fps = gpuFps > 0 ? gpuFps : r.Fps > 0 ? r.Fps : (double?)null;
+            bool fromGpu = gpuFps > 0;
             if (pid != _histPid) { FpsHist.Clear(); _histPid = pid; }
             if (fps != null)
             {
@@ -84,7 +96,7 @@ namespace Pixo.Data
                 Name = PrettyName(exe),
                 Pid = pid,
                 Fps = fps,
-                FrameMs = r.frameMs > 0 ? r.frameMs : (double?)null,
+                FrameMs = !fromGpu && r.FrameMs > 0 ? r.FrameMs : fps > 0 ? 1000.0 / fps : (double?)null,
                 MinFps = FpsHist.Count > 3 ? FpsHist.Min() : (double?)null
             };
         }
@@ -102,34 +114,82 @@ namespace Pixo.Data
 
         // ---------------- RivaTuner Statistics Server ----------------
 
-        private static Dictionary<int, (double fps, double frameMs)> ReadRtss()
+        public struct RtssEntry
         {
-            var result = new Dictionary<int, (double, double)>();
+            public int Pid;
+            public string Name;
+            public double Fps, FrameMs;
+            public bool Active;   // atualizado nos últimos segundos
+        }
+
+        private static string _rtssStatus = "";
+
+        private static List<RtssEntry> ReadRtss()
+        {
+            var result = new List<RtssEntry>();
             try
             {
                 using var mmf = MemoryMappedFile.OpenExisting("RTSSSharedMemoryV2", MemoryMappedFileRights.Read);
                 using var view = mmf.CreateViewAccessor(0, 0, MemoryMappedFileAccess.Read);
                 uint sig = view.ReadUInt32(0);
-                if (sig != 0x52545353) return result; // 'RTSS'
+                uint ver = view.ReadUInt32(4);
                 uint entrySize = view.ReadUInt32(8);
                 uint arrOffset = view.ReadUInt32(12);
                 uint arrSize = view.ReadUInt32(16);
+                _rtssStatus = $"memória do RivaTuner aberta: assinatura 0x{sig:X8}, versão 0x{ver:X8}, {arrSize} entradas de {entrySize} bytes";
+                if (sig != 0x52545353) return result; // 'RTSS' (diferente disso = RTSS fechando ou incompatível)
+                uint now = unchecked((uint)Environment.TickCount);
                 for (uint i = 0; i < arrSize; i++)
                 {
-                    long b = arrOffset + i * entrySize;
-                    if (b + 288 > view.Capacity) break;
+                    long b = arrOffset + (long)i * entrySize;
+                    if (b + 284 > view.Capacity) break;
                     int pid = (int)view.ReadUInt32(b);
                     if (pid == 0) continue;
                     // depois do pid: nome (260 bytes), flags, time0, time1, frames, frameTime(µs)
+                    var nameBytes = new byte[260];
+                    view.ReadArray(b + 4, nameBytes, 0, 260);
+                    int z = Array.IndexOf(nameBytes, (byte)0);
+                    string name = Encoding.Default.GetString(nameBytes, 0, z < 0 ? 260 : z);
                     uint t0 = view.ReadUInt32(b + 268);
                     uint t1 = view.ReadUInt32(b + 272);
                     uint frames = view.ReadUInt32(b + 276);
                     uint frameTime = view.ReadUInt32(b + 280);
-                    if (t1 > t0) result[pid] = (1000.0 * frames / (t1 - t0), frameTime / 1000.0);
+                    double fps = t1 > t0 ? 1000.0 * frames / (t1 - t0) : 0;
+                    // a contagem de quadros também dá o FPS pelo tempo de quadro, se o intervalo vier zerado
+                    if (fps <= 0 && frameTime > 0) fps = 1_000_000.0 / frameTime;
+                    result.Add(new RtssEntry
+                    {
+                        Pid = pid, Name = name, Fps = fps, FrameMs = frameTime / 1000.0,
+                        Active = unchecked(now - t1) < 5000
+                    });
                 }
             }
-            catch { }
+            catch (FileNotFoundException) { _rtssStatus = "RivaTuner não encontrado (memória compartilhada não existe: ele está aberto?)"; }
+            catch (Exception ex) { _rtssStatus = "erro ao ler o RivaTuner: " + ex.GetType().Name + " - " + ex.Message; }
             return result;
+        }
+
+        // ---------------- diagnóstico (jogo.txt ao lado do Pixo.exe) ----------------
+
+        private static DateTime _lastDiag = DateTime.MinValue;
+
+        private static void WriteDiag(int pid, string exe, bool isGame, List<RtssEntry> rtss, double? gpuFps)
+        {
+            if ((DateTime.Now - _lastDiag).TotalSeconds < 3) return;
+            _lastDiag = DateTime.Now;
+            try
+            {
+                var sb = new StringBuilder();
+                sb.AppendLine("Pixo - diagnóstico de jogo/FPS em " + DateTime.Now.ToString("dd/MM/yyyy HH:mm:ss"));
+                sb.AppendLine("Janela em primeiro plano: pid " + pid + " | " + exe);
+                sb.AppendLine("Considerado jogo: " + (isGame ? "sim" : "não"));
+                sb.AppendLine("FPS da placa de vídeo (sensor): " + (gpuFps?.ToString("0.0") ?? "(nenhum)"));
+                sb.AppendLine(_rtssStatus);
+                foreach (var e in rtss)
+                    sb.AppendLine($"  RTSS pid {e.Pid} | {e.Name} | {e.Fps:0.0} fps | {e.FrameMs:0.00} ms | ativo: {(e.Active ? "sim" : "não")}");
+                File.WriteAllText(Path.Combine(AppContext.BaseDirectory, "jogo.txt"), sb.ToString());
+            }
+            catch { }
         }
 
         // ---------------- Win32 ----------------
