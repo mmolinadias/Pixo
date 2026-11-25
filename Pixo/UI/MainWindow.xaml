@@ -208,6 +208,15 @@
                                     <TextBlock Width="44" TextAlignment="Right" Text="{Binding Brightness, StringFormat={}{0:0}%}" VerticalAlignment="Center" />
                                 </StackPanel>
                             </ui:CardControl>
+                            <ui:CardControl Style="{StaticResource Row}">
+                                <ui:CardControl.Header>
+                                    <StackPanel>
+                                        <TextBlock Text="Velocidade" Style="{StaticResource RowTitle}" />
+                                        <TextBlock Text="Quadros que chegam na tela por segundo e quanto passa pelo USB (o limite da tela é ~166 KB/s)" Style="{StaticResource RowHint}" TextWrapping="Wrap" MaxWidth="420" />
+                                    </StackPanel>
+                                </ui:CardControl.Header>
+                                <TextBlock x:Name="PerfText" Text="—" VerticalAlignment="Center" />
+                            </ui:CardControl>
                             <TextBlock Text="Cores da tela" Style="{StaticResource SectionTitle}" />
                             <TextBlock Text="A tela física mostra cores mais apagadas que o monitor. Ajuste olhando para ela: a mudança aparece na hora." Style="{StaticResource RowHint}" Margin="0,0,0,8" />
                             <ui:CardControl Style="{StaticResource Row}">

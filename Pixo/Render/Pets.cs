@@ -6,9 +6,9 @@ namespace Pixo.Render
 {
     /// <summary>
     /// Fred (cachorro) e Dengo (gato) em pixel art — tradução do sistema de design Pixo.
-    /// Cada bichinho é desenhado numa grade 36×36; a dupla numa grade 60×36
-    /// (Fred em x−1, Dengo em x+23), sobre uma almofada. Na tela, é ampliada 6× (360×216)
-    /// sem suavização.
+    /// Cada bichinho é desenhado numa grade 36×36 (a dupla ocupa 60×36: Fred em x−1, Dengo em x+23),
+    /// sobre uma almofada, e aparece ampliado 6× (360×216). A arte fica sempre em blocos de 6 px;
+    /// o pulo, o esticar, a inclinação e os efeitos andam pixel a pixel (RenderDuoScreen).
     ///
     /// Este arquivo não usa WPF: só calcula os pixels (ARGB). Assim dá para testar fora do Windows.
     /// </summary>
@@ -50,10 +50,18 @@ namespace Pixo.Render
             public List<object[]> Fx = new List<object[]>();
         }
 
-        private static Pose MakePose(string state, int f)
+        /// <summary>
+        /// Pose num instante da animação. "fp" pode ter fração (3,4 = 40% do caminho da pose 3 à 4).
+        /// Tudo que é movimento (pulo, respiração, inclinação, efeitos) é calculado no instante exato;
+        /// olhos, boca e braços trocam a cada quadro, como no design.
+        /// </summary>
+        private static Pose MakePose(string state, double fp)
         {
-            int n = States[state].Durations.Length;
-            double s = Math.Sin((double)f / n * Math.PI * 2);
+            var info = States[state];
+            int n = info.Durations.Length;
+            fp = Math.Clamp(fp, 0, info.Loop ? n - 1e-6 : n - 1);
+            int f = (int)Math.Floor(fp);
+            double s = Math.Sin(fp / n * Math.PI * 2);
             var p = new Pose();
             switch (state)
             {
@@ -69,17 +77,18 @@ namespace Pixo.Render
                     else if (f >= 2 && f <= 9)
                     {
                         p.Eyes = "happy";
-                        p.Fx.Add(new object[] { "heart", 128 + (f - 2) * 1.5, 52 - (f - 2) * 5.0, Math.Min(1.4, 0.6 + (f - 2) * 0.25) * (f > 8 ? 0.7 : 1) });
+                        double h = fp - 2; // sobe sem parar; o tamanho troca por quadro
+                        p.Fx.Add(new object[] { "heart", 128 + h * 1.5, 52 - h * 5.0, Math.Min(1.4, 0.6 + (f - 2) * 0.25) * (f > 8 ? 0.7 : 1) });
                     }
                     break;
                 case "ocupado":
-                    s = Math.Sin((double)f / n * Math.PI * 4);
+                    s = Math.Sin(fp / n * Math.PI * 4);
                     p.Sy = 1 + 0.04 * s; p.Sx = 1 - 0.025 * s; p.Dy = -2 * Math.Abs(s);
                     p.Eyes = "focus"; p.Mouth = "flat"; p.Arms = f % 2 == 1 ? "tapA" : "tapB";
-                    p.Fx.Add(new object[] { "sweat", 132.0, 66.0 + f * 3 });
+                    p.Fx.Add(new object[] { "sweat", 132.0, 66.0 + fp * 3 });
                     break;
                 case "quente":
-                    s = Math.Sin((double)f / n * Math.PI * 4);
+                    s = Math.Sin(fp / n * Math.PI * 4);
                     p.Sy = 1 + 0.05 * s; p.Sx = 1 - 0.03 * s;
                     p.Hot = true; p.Eyes = "half"; p.Mouth = f % 2 == 1 ? "pant" : "pant2";
                     p.Fx.Add(new object[] { "heat", (double)f });
@@ -89,89 +98,48 @@ namespace Pixo.Render
                     p.Eyes = "closed"; p.Mouth = "sleep";
                     for (int i = 0; i < 3; i++)
                     {
-                        int ph = (f + i * 4) % 12;
-                        p.Fx.Add(new object[] { "z", 122 + ph * 2.2, 62 - ph * 4.0, 3.5 + ph * 0.55 });
+                        double ph = (fp + i * 4) % 12; // cada "z" sobe devagar e cresce por etapas
+                        p.Fx.Add(new object[] { "z", 122 + ph * 2.2, 62 - ph * 4.0, 3.5 + Math.Floor(ph) * 0.55 });
                     }
                     break;
                 case "jogando":
-                    double b = Math.Abs(Math.Sin((double)f / n * Math.PI * 2));
+                    double b = Math.Abs(Math.Sin(fp / n * Math.PI * 2));
                     p.Dy = -4 * b; p.Sy = 1 - 0.03 * b; p.Eyes = f == 5 ? "happy" : "open"; p.LookY = 2; p.Look = f < 4 ? -1 : 1;
                     p.Mouth = "grin"; p.Arms = "controller"; p.Phones = true; p.Btn = f % 2;
                     break;
                 case "musica":
-                    double w = Math.Sin((double)f / n * Math.PI * 2);
-                    p.Tilt = 0.13 * w; p.Dy = -3 * Math.Abs(Math.Sin((double)f / n * Math.PI * 4)); p.Eyes = "happy"; p.Mouth = "smile";
-                    p.Arms = w > 0 ? "swayR" : "swayL";
-                    p.Fx.Add(new object[] { "note", 34.0 - (f % 4), 70.0 - f * 4, "#ff699c", false });
-                    p.Fx.Add(new object[] { "note", 136.0 + (f % 3), 56.0 - ((f + 4) % 8) * 4, "#42cfef", true });
+                    double w = Math.Sin(fp / n * Math.PI * 2);
+                    p.Tilt = 0.13 * w; p.Dy = -3 * Math.Abs(Math.Sin(fp / n * Math.PI * 4)); p.Eyes = "happy"; p.Mouth = "smile";
+                    p.Arms = Math.Sin((double)f / n * Math.PI * 2) > 0 ? "swayR" : "swayL";
+                    p.Fx.Add(new object[] { "note", 34.0 - (f % 4), 70.0 - fp * 4, "#ff699c", false });
+                    p.Fx.Add(new object[] { "note", 136.0 + (f % 3), 56.0 - ((fp + 4) % 8) * 4, "#42cfef", true });
                     break;
                 case "susto":
                     double[] dys = { 0, -10, -16, -12, -4, 0, 0, 0, 0, 0 }, sys = { 0.9, 1.06, 1.05, 1.02, 1, 0.88, 1.04, 0.98, 1, 1 };
-                    p.Dy = dys[f]; p.Sy = sys[f]; p.Sx = 2 - sys[f];
+                    p.Dy = Curve(dys, fp); p.Sy = Curve(sys, fp); p.Sx = 2 - p.Sy;
                     p.Eyes = f >= 1 && f <= 6 ? "wide" : (f == 0 ? "blink" : "open"); p.Mouth = f >= 1 && f <= 6 ? "o" : "smile";
                     p.Arms = f >= 1 && f <= 4 ? "up" : "down";
-                    if (f >= 1 && f <= 7) p.Fx.Add(new object[] { "bang", 140.0, 40.0 + (f < 3 ? 6 - f * 3 : 0) });
+                    if (f >= 1 && f <= 7) p.Fx.Add(new object[] { "bang", 140.0, 40.0 + Math.Max(0, 6 - fp * 3) });
                     break;
                 case "comemora":
                     double[] dyc = { 0, -6, -16, -20, -14, -2, 0, -10, -16, -10, -2, 0 }, syc = { 0.9, 1.05, 1.06, 1.04, 1.02, 1, 0.9, 1.05, 1.04, 1.02, 0.94, 1 };
-                    p.Dy = dyc[f]; p.Sy = syc[f]; p.Sx = 2 - syc[f];
+                    p.Dy = Curve(dyc, fp); p.Sy = Curve(syc, fp); p.Sx = 2 - p.Sy;
                     p.Eyes = "happy"; p.Mouth = "grin"; p.Arms = f == 0 || f == 6 || f == 11 ? "down" : "up";
-                    p.Fx.Add(new object[] { "confetti", (double)f });
+                    p.Fx.Add(new object[] { "confetti", fp });
                     break;
             }
             return p;
         }
 
-        private static double Lerp(double a, double b, double t) => a + (b - a) * t;
-
-        /// <summary>Mistura duas poses (o que é medida desliza; olhos, boca e braços trocam na metade).</summary>
-        private static Pose Blend(Pose a, Pose b, double t, bool wrapped)
+        /// <summary>Curva suave (Catmull-Rom) passando pelos valores da tabela: pulos com arco natural.</summary>
+        private static double Curve(double[] v, double t)
         {
-            if (t <= 0.001) return a;
-            var p = t < 0.5 ? a : b;
-            var r = new Pose
-            {
-                Dy = Lerp(a.Dy, b.Dy, t), Sx = Lerp(a.Sx, b.Sx, t), Sy = Lerp(a.Sy, b.Sy, t),
-                Tilt = Lerp(a.Tilt, b.Tilt, t), Look = Lerp(a.Look, b.Look, t), LookY = Lerp(a.LookY, b.LookY, t),
-                Eyes = p.Eyes, Mouth = p.Mouth, Arms = p.Arms, Hot = p.Hot, Phones = p.Phones, Btn = p.Btn,
-            };
-            if (a.Fx.Count == b.Fx.Count && a.Fx.Select(x => x[0]).SequenceEqual(b.Fx.Select(x => x[0])))
-            {
-                for (int i = 0; i < a.Fx.Count; i++)
-                {
-                    var fa = a.Fx[i];
-                    var fb = b.Fx[i];
-                    var kind = (string)fa[0];
-                    var item = (object[])fa.Clone();
-                    for (int j = 1; j < fa.Length; j++)
-                    {
-                        if (fa[j] is double da && fb[j] is double db)
-                        {
-                            if ((kind == "heat" || kind == "confetti") && j == 1)
-                                item[j] = da + t;                              // contador de quadro
-                            else if (Math.Abs(db - da) > 25 || wrapped && Math.Abs(db - da) > 12)
-                                item[j] = t < 0.5 ? da : db;                   // "pulo" do loop
-                            else
-                                item[j] = Lerp(da, db, t);
-                        }
-                    }
-                    r.Fx.Add(item);
-                }
-            }
-            else r.Fx = p.Fx;
-            return r;
-        }
-
-        /// <summary>Pose numa posição "entre quadros" (3,4 = 40% do caminho da pose 3 à 4).</summary>
-        private static Pose PoseAt(string state, double pos)
-        {
-            var info = States[state];
-            int n = info.Durations.Length;
-            pos = Math.Clamp(pos, 0, n - 1 + (info.Loop ? 0.999 : 0));
-            int f = (int)Math.Floor(pos);
-            double t = pos - f;
-            int f2 = info.Loop ? (f + 1) % n : Math.Min(f + 1, n - 1);
-            return f2 == f ? MakePose(state, f) : Blend(MakePose(state, f), MakePose(state, f2), t, f2 < f);
+            int last = v.Length - 1;
+            int i = Math.Clamp((int)Math.Floor(t), 0, last);
+            if (i >= last) return v[last];
+            double u = t - i;
+            double p0 = v[Math.Max(0, i - 1)], p1 = v[i], p2 = v[i + 1], p3 = v[Math.Min(last, i + 2)];
+            return 0.5 * (2 * p1 + (p2 - p0) * u + (2 * p0 - 5 * p1 + 4 * p2 - p3) * u * u + (3 * p1 - p0 - 3 * p2 + p3) * u * u * u);
         }
 
         // ---------------- cores ----------------
@@ -245,14 +213,17 @@ namespace Pixo.Render
         /// <summary>Arredonda como o JavaScript (0,5 sobe), para bater pixel a pixel com o design.</summary>
         private static int Rnd(double v) => (int)Math.Floor(v + 0.5);
 
+        /// <summary>Um efeito (coração, nota, "z"...) com posição fracionária na grade do bichinho.</summary>
+        private struct FxStamp { public string[] Map; public double X, Y; public Func<char, uint> Cm; }
+        private static readonly string[] Dot = { "x" };
+
         /// <summary>
-        /// Desenha um bichinho numa grade 36×36. Devolve o personagem (com contorno), os efeitos
-        /// e a largura da sombra.
+        /// Desenha um bichinho numa grade 36×36, "em pé": sem pulo, sem esticar e sem inclinar
+        /// (isso é aplicado depois, pixel a pixel, em DrawPetScreen). Devolve o personagem
+        /// (com contorno) e a lista de efeitos.
         /// </summary>
-        private static (uint[] chr, uint[] fx, int shadow) DrawPet(Kind K, Pose p, int f, double lean, bool mirrorTilt, char only)
+        private static (uint[] chr, List<FxStamp> fx) DrawPet(Kind K, Pose p, int f, char only)
         {
-            p.Tilt += lean;
-            if (mirrorTilt) p.Tilt = -p.Tilt;
             // efeitos de cada um: o Fred não tem "Zzz" nem a nota dupla; o Dengo não tem a nota simples
             var fxList = only == 'a'
                 ? p.Fx.Where(e => !((string)e[0] == "note" && (bool)e[4]) && (string)e[0] != "z").ToList()
@@ -260,20 +231,17 @@ namespace Pixo.Render
 
             uint body = K.Body, shade = K.Shade, light = K.Light, line = K.Line; // a dupla mantém as cores no calor
             var chr = new uint[N * N];
-            var fx = new uint[N * N];
-            int dy = Rnd(p.Dy / 5);
-            int H = K.H + Rnd((p.Sy - 1) * 30), W = K.W + 2 * Rnd((p.Sx - 1) * 15);
-            int bottom = 28 + dy, top = bottom - H + 1;
+            var fx = new List<FxStamp>();
+            int H = K.H, W = K.W;
+            int bottom = 28, top = bottom - H + 1;
             double L = 18 - W / 2.0, R = 18 + W / 2.0 - 1;
-            double tilt = p.Tilt;
 
-            int Sh(double y) => Rnd(tilt * 0.7 * (G - y));
             void Set(uint[] buf, double x, double y, uint c)
             {
                 int xi = Rnd(x), yi = Rnd(y);
                 if (xi >= 0 && xi < N && yi >= 0 && yi < N) buf[yi * N + xi] = c;
             }
-            void Cs(double x, double y, uint c) => Set(chr, x + Sh(y), y, c);
+            void Cs(double x, double y, uint c) => Set(chr, x, y, c);
             uint Get(int x, int y) => x < 0 || y < 0 || x >= N || y >= N ? 0 : chr[y * N + x];
             void Stamp(uint[] buf, string[] map, double x, double y, Func<char, uint> cmap, bool shear)
             {
@@ -486,26 +454,29 @@ namespace Pixo.Render
                         outBuf[y2 * N + x2] = line;
                 }
 
-            // efeitos
-            int X(double v) => Rnd(v / 5);
+            // efeitos: guardados com posição fracionária; DrawPetScreen desenha cada um em
+            // blocos de 6 px que andam de 1 em 1 pixel
+            double X(double v) => v / 5;
+            void Fx(string[] map, double x, double y, Func<char, uint> cm) => fx.Add(new FxStamp { Map = map, X = x, Y = y, Cm = cm });
             foreach (var e in fxList)
             {
                 switch ((string)e[0])
                 {
                     case "heart":
-                        Stamp(fx, (double)e[3] > 1.1 ? new[] { "pp.pp", "ppppp", "ppppp", ".ppp.", "..p.." } : new[] { "p.p", "ppp", ".p." },
-                            X((double)e[1]) - 2, X((double)e[2]) - 2, M(('p', C("#ff699c"))), false);
+                        Fx((double)e[3] > 1.1 ? new[] { "pp.pp", "ppppp", "ppppp", ".ppp.", "..p.." } : new[] { "p.p", "ppp", ".p." },
+                            X((double)e[1]) - 2, X((double)e[2]) - 2, M(('p', C("#ff699c"))));
                         break;
                     case "sweat":
-                        Stamp(fx, new[] { ".d.", "ddd", "dwd", ".d." }, X((double)e[1]), X((double)e[2]) - 2, M(('d', C("#7bc7ff")), ('w', C("#d6efff"))), false);
+                        Fx(new[] { ".d.", "ddd", "dwd", ".d." }, X((double)e[1]), X((double)e[2]) - 2, M(('d', C("#7bc7ff")), ('w', C("#d6efff"))));
                         break;
                     case "heat":
                         {
                             int ef = (int)Math.Floor((double)e[1]);
                             int[] hxs = { 9, 24, 28 }, off = { 0, 1, 1, 0, -1, -1 };
+                            var hc = M(('x', C("#ffa639")));
                             for (int i = 0; i < 3; i++)
                                 for (int j = 0; j < 7; j++)
-                                    Set(fx, hxs[i] + off[(j + ef + i * 2) % 6], 9 - j + (i == 0 ? 1 : 0), C("#ffa639"));
+                                    Fx(Dot, hxs[i] + off[(j + ef + i * 2) % 6], 9 - j + (i == 0 ? 1 : 0), hc);
                             break;
                         }
                     case "z":
@@ -514,15 +485,15 @@ namespace Pixo.Render
                             var zs = size < 5 ? new[] { "zzz", ".z.", "zzz" }
                                 : size < 7.5 ? new[] { "zzzz", "..z.", ".z..", "zzzz" }
                                 : new[] { "zzzzz", "...z.", "..z..", ".z...", "zzzzz" };
-                            Stamp(fx, zs, X((double)e[1]), X((double)e[2]) - 2, M(('z', C("#9ca6b5"))), false);
+                            Fx(zs, X((double)e[1]), X((double)e[2]) - 2, M(('z', C("#9ca6b5"))));
                             break;
                         }
                     case "note":
-                        Stamp(fx, (bool)e[4] ? new[] { "..nnn", "..n.n", "..n.n", "nnnnn", "nn.nn" } : new[] { "..nn", "..n.", "..n.", "nnn.", "nn.." },
-                            X((double)e[1]), X((double)e[2]) - 4, M(('n', C((string)e[3]))), false);
+                        Fx((bool)e[4] ? new[] { "..nnn", "..n.n", "..n.n", "nnnnn", "nn.nn" } : new[] { "..nn", "..n.", "..n.", "nnn.", "nn.." },
+                            X((double)e[1]), X((double)e[2]) - 4, M(('n', C((string)e[3]))));
                         break;
                     case "bang":
-                        Stamp(fx, new[] { "yy", "yy", "yy", "yy", "..", "yy" }, X((double)e[1]) - 1, X((double)e[2]) - 3, M(('y', C("#ffc739"))), false);
+                        Fx(new[] { "yy", "yy", "yy", "yy", "..", "yy" }, X((double)e[1]) - 1, X((double)e[2]) - 3, M(('y', C("#ffc739"))));
                         break;
                     case "confetti":
                         {
@@ -532,22 +503,19 @@ namespace Pixo.Render
                             for (int c2 = 0; c2 < 10; c2++)
                             {
                                 double ang = c2 / 10.0 * Math.PI * 2 + 0.3, r = 74 + ev * 3;
-                                int px = X(90 + Math.Cos(ang) * r * 0.95), py = X(96 + Math.Sin(ang) * r * 0.7 + ev * 1.6);
+                                double gx = X(90 + Math.Cos(ang) * r * 0.95), gy = X(96 + Math.Sin(ang) * r * 0.7 + ev * 1.6);
+                                int px = Rnd(gx), py = Rnd(gy);
                                 if (px < 1 || px > 34 || py < 1 || py > 33 || Get(px, py) != 0) continue;
-                                Set(fx, px, py, C(cols[c2 % 5]));
-                                Set(fx, px + ((c2 + ef) % 2), py + ((c2 + ef + 1) % 2), C(cols[c2 % 5]));
+                                var cm = M(('x', C(cols[c2 % 5])));
+                                Fx(Dot, gx, gy, cm);
+                                Fx(Dot, gx + ((c2 + ef) % 2), gy + ((c2 + ef + 1) % 2), cm);
                             }
                             break;
                         }
                 }
             }
 
-            // sombra no chão (encolhe no pulo)
-            double k = Math.Max(0.5, 1 + p.Dy / 40);
-            int sw2 = Rnd(9 * k);
-
-            // personagem por cima dos efeitos? no design, efeitos vêm depois (por cima)
-            return (outBuf, fx, sw2);
+            return (outBuf, fx);
         }
 
         // ---------------- a dupla ----------------
@@ -557,18 +525,58 @@ namespace Pixo.Render
             ["feliz"] = 6, ["ocupado"] = 3, ["quente"] = 2, ["dormindo"] = 6, ["jogando"] = 4, ["musica"] = 0, ["susto"] = 1, ["comemora"] = 3
         };
 
+        /// <summary>Tamanho da dupla na tela: 360×216 (a grade 60×36 ampliada 6×).</summary>
+        public const int ScreenW = DuoW * Scale, ScreenH = DuoH * Scale;
+
         /// <summary>
-        /// Desenha a dupla (60×36, ARGB com transparência) na posição de animação "pos"
-        /// (pode ter fração, para a animação ficar fluida).
+        /// De quantos em quantos pixels da tela o movimento anda em cada animação (1 = mais liso;
+        /// 6 = igual à grade do design). Cada pixel andado custa banda no USB, que na tela real é de
+        /// só ~166 KB/s; estes valores foram escolhidos medindo no PixoSim para cada animação caber
+        /// no tempo de um quadro (ou chegar o mais perto possível).
         /// </summary>
-        public static uint[] RenderDuo(string state, double pos, bool cushion = true)
+        private static readonly Dictionary<string, int> Steps = new Dictionary<string, int>
+        {
+            // movimentos lentos: passo pequeno (liso e barato)
+            ["feliz"] = 1, ["feliz_coracao"] = 1, ["susto"] = 1, ["comemora"] = 1, ["dormindo"] = 2, ["jogando"] = 3,
+            // movimentos rápidos andam 5–7 px por quadro de qualquer jeito; em blocos inteiros custam
+            // metade e sobra banda para mais quadros por segundo
+            ["ocupado"] = 6, ["quente"] = 6, ["musica"] = 6,
+        };
+
+        /// <summary>Força um passo para todas as animações (só para medir no PixoSim; null = o de cada uma).</summary>
+        public static int? StepOverride;
+
+        private static int StepFor(string state) => StepOverride ?? (Steps.TryGetValue(state, out var v) ? v : 1);
+
+        /// <summary>
+        /// Como o design arredonda o pulo para blocos inteiros, balanços de menos de meio bloco
+        /// nunca aparecem lá. Aqui também não; acima disso o movimento cresce suave até bater
+        /// com o design a partir de 1 bloco.
+        /// </summary>
+        private static double Soft(double g)
+        {
+            double a = Math.Abs(g);
+            return a <= 0.4 ? 0 : Math.Sign(g) * (a >= 1 ? a : (a - 0.4) / 0.6);
+        }
+
+        /// <summary>
+        /// Desenha a dupla direto na resolução da tela (360×216, ARGB; 0 = transparente) em "dst".
+        /// A arte continua em blocos de 6 px, mas pulo, respiração, inclinação, sombra e efeitos
+        /// andam de 1 em 1 pixel: o movimento fica fluido e cada quadro muda pouca coisa no USB.
+        /// "pos" pode ter fração (3,4 = 40% do caminho da pose 3 à 4).
+        /// </summary>
+        public static void RenderDuoScreen(string state, double pos, uint[] dst, bool cushion = true)
+            => RenderDuoScreen(state, pos, null, 0, 1, dst, cushion);
+
+        /// <summary>
+        /// Igual, mas vindo de outro estado ("from", na posição fromPos): mix = 0 é o movimento do
+        /// estado antigo, 1 é o do novo. Assim a troca de estado não dá tranco.
+        /// </summary>
+        public static void RenderDuoScreen(string state, double pos, string from, double fromPos, double mix, uint[] dst, bool cushion = true)
         {
             if (!States.ContainsKey(state)) state = "feliz";
-            var info = States[state];
-            int n = info.Durations.Length;
-
-            // imagem em cor "pré-multiplicada" para misturar a sombra semitransparente
-            var buf = new double[DuoW * DuoH * 4];
+            if (from != null && !States.ContainsKey(from)) from = null;
+            Array.Clear(dst, 0, ScreenW * ScreenH);
 
             if (cushion)
             {
@@ -576,80 +584,133 @@ namespace Pixo.Render
                 {
                     (31, 6, 53, "#3b4354"), (32, 4, 55, "#2b3140"), (33, 3, 56, "#2b3140"), (34, 3, 56, "#232834"), (35, 5, 54, "#1b1f28")
                 };
-                foreach (var r in rows) FillOpaque(buf, r.x0, r.y, r.x1 - r.x0 + 1, 1, C(r.c));
-                foreach (var x in new[] { 10, 17, 24, 31, 38, 45, 52 }) FillOpaque(buf, x, 31, 1, 1, C("#4a5468"));
+                foreach (var r in rows) FillPx(dst, r.x0 * Scale, r.y * Scale, (r.x1 - r.x0 + 1) * Scale, Scale, C(r.c));
+                foreach (var x in new[] { 10, 17, 24, 31, 38, 45, 52 }) FillPx(dst, x * Scale, 31 * Scale, Scale, Scale, C("#4a5468"));
             }
 
-            int ph = Phase.TryGetValue(state, out var v) ? v : 0;
-            double posA = pos;
-            double posB = info.Loop ? (pos + ph) % n : Math.Max(0, pos - ph);
-            double[] lean = state == "dormindo" ? new[] { 0.06, -0.06 } : new[] { 0.0, 0.0 };
-
-            DrawInto(buf, Fred, PoseAt(state, posA), (int)Math.Floor(posA), lean[0], false, 'a', -1);
-            DrawInto(buf, Dengo, PoseAt(state, posB), (int)Math.Floor(posB), lean[1], state == "musica", 'b', 23);
-
-            // de volta para ARGB "normal"
-            var outArgb = new uint[DuoW * DuoH];
-            for (int i = 0; i < outArgb.Length; i++)
+            var (poseA, fA, poseB, fB) = Poses(state, pos);
+            if (from != null && mix < 1)
             {
-                double a = buf[i * 4 + 3];
-                if (a <= 0) continue;
-                uint r = (uint)Math.Round(buf[i * 4] / a), g = (uint)Math.Round(buf[i * 4 + 1] / a), b = (uint)Math.Round(buf[i * 4 + 2] / a);
-                uint A = (uint)Math.Round(a * 255);
-                outArgb[i] = (A << 24) | (Math.Min(r, 255u) << 16) | (Math.Min(g, 255u) << 8) | Math.Min(b, 255u);
+                // troca de estado: o corpo desliza da pose antiga para a nova
+                // (olhos, boca e efeitos já são os do estado novo)
+                var (oldA, _, oldB, _) = Poses(from, fromPos);
+                double t = Math.Clamp(mix, 0, 1);
+                t = t * t * (3 - 2 * t); // começa e termina devagar
+                Glide(poseA, oldA, t);
+                Glide(poseB, oldB, t);
             }
-            return outArgb;
+            double[] lean = state == "dormindo" ? new[] { 0.06, -0.06 } : new[] { 0.0, 0.0 };
+            int step = StepFor(state);
+            DrawPetScreen(dst, Fred, poseA, fA, lean[0], false, 'a', -1, step);
+            DrawPetScreen(dst, Dengo, poseB, fB, lean[1], state == "musica", 'b', 23, step);
         }
 
-        private static void DrawInto(double[] duo, Kind kind, Pose p, int f, double lean, bool mirror, char only, int offsetX)
+        /// <summary>Poses do Fred e do Dengo (o Dengo anda um pouco defasado, como no design).</summary>
+        private static (Pose a, int fa, Pose b, int fb) Poses(string state, double pos)
         {
-            var (chr, fx, sw2) = DrawPet(kind, p, f, lean, mirror, only);
+            var info = States[state];
+            int n = info.Durations.Length;
+            int ph = Phase.TryGetValue(state, out var v) ? v : 0;
+            double posB = info.Loop ? ((pos + ph) % n + n) % n : Math.Max(0, pos - ph);
+            return (MakePose(state, pos), (int)Math.Floor(pos), MakePose(state, posB), (int)Math.Floor(posB));
+        }
 
-            // camada do bichinho (36×36), como o canvas temporário do design
-            var tmp = new double[N * N * 4];
-            // sombra: preto com 38% de opacidade
-            for (int x = 18 - sw2; x < 18 + sw2; x++) BlendInto(tmp, N, x, G + 1, 0, 0, 0, 0.38);
-            for (int x = 18 - sw2 + 2; x < 18 - sw2 + 2 + (sw2 - 2) * 2; x++) BlendInto(tmp, N, x, G + 2, 0, 0, 0, 0.38);
-            // personagem, depois efeitos (opacos)
-            foreach (var layer in new[] { chr, fx })
-                for (int i = 0; i < N * N; i++)
-                    if (layer[i] != 0)
-                    {
-                        uint c = layer[i];
-                        BlendInto(tmp, N, i % N, i / N, (c >> 16) & 255, (c >> 8) & 255, c & 255, 1);
-                    }
+        /// <summary>Leva as medidas do corpo de "p" na direção de "old" (t = 0: igual a old; t = 1: igual a p).</summary>
+        private static void Glide(Pose p, Pose old, double t)
+        {
+            p.Dy = old.Dy + (p.Dy - old.Dy) * t;
+            p.Sy = old.Sy + (p.Sy - old.Sy) * t;
+            p.Sx = old.Sx + (p.Sx - old.Sx) * t;
+            p.Tilt = old.Tilt + (p.Tilt - old.Tilt) * t;
+        }
 
-            // cola na dupla, deslocado
-            for (int y = 0; y < N; y++)
-                for (int x = 0; x < N; x++)
+        /// <summary>
+        /// Um bichinho na tela: sombra, corpo (com pulo, esticar/achatar e inclinação aplicados
+        /// pixel a pixel) e efeitos. offsetX em blocos da grade da dupla.
+        /// </summary>
+        private static void DrawPetScreen(uint[] dst, Kind kind, Pose p, int f, double lean, bool mirror, char only, int offsetX, int step)
+        {
+            const int S = Scale;
+            int Q(double px) => Rnd(px / step) * step; // arredonda para o passo do movimento
+            double tilt = p.Tilt + lean;
+            if (mirror) tilt = -tilt;
+            var (chr, fx) = DrawPet(kind, p, f, only);
+            int ox = offsetX * S;
+
+            // sombra no chão (preto com 38% de opacidade); encolhe quando eles pulam
+            double sw = 9 * Math.Max(0.5, 1 + p.Dy / 40);
+            Shade(dst, ox + Q((18 - sw) * S), ox + Q((18 + sw) * S), (G + 1) * S, S);
+            Shade(dst, ox + Q((20 - sw) * S), ox + Q((16 + sw) * S), (G + 2) * S, S);
+
+            // corpo: cada pixel da tela procura de qual bloco da arte ele vem
+            // (desfaz o pulo, a inclinação e o esticar/achatar, nessa ordem)
+            const int midX = 18 * S, shearY = G * S;
+            // O design estica a altura em (Sy − 1)·30 blocos. Aqui o esticar acontece só na testa:
+            // o alto da cabeça e as orelhas sobem/descem como um bloco e o rosto fica parado
+            // (menos bordas mudam por quadro = menos USB; e os olhos não deformam).
+            double dH = (p.Sy - 1) * 30, dW = (p.Sx - 1) * 30;
+            int eyG = 29 - kind.H + Rnd(kind.H * 0.42);
+            int sliceY = (eyG - 1) * S;             // linha da testa, logo acima dos olhos
+            int dTop = Q(dH * S);
+            // a largura muda pouco nas animações calmas (menos de 1 bloco nem aparece no design);
+            // nos pulos o corpo alarga/estreita inteiro
+            dW = Math.Sign(dW) * Math.Max(0, Math.Abs(dW) - 1);
+            double sx = 1 + Q(dW * S / 2) / (double)(kind.W * S / 2);
+            int dyPx = Q(Soft(p.Dy / 5) * S);
+            for (int ys = 0; ys < ScreenH; ys++)
+            {
+                double ty = ys - dyPx;
+                double gyf = (ty < sliceY ? Math.Min(ty + dTop, sliceY) : ty) / S;
+                if (gyf < 0 || gyf >= N) continue;
+                int row = (int)gyf * N;
+                // a inclinação anda por linha da arte (não por linha da tela), para não sobrar lascas soltas
+                int shift = Q(tilt * 0.7 * (shearY - ((int)gyf + 0.5) * S));
+                int drow = ys * ScreenW;
+                for (int xs = 0; xs < N * S; xs++)
                 {
-                    int k = (y * N + x) * 4;
-                    double a = tmp[k + 3];
-                    if (a <= 0) continue;
-                    int dx = x + offsetX;
-                    if (dx < 0 || dx >= DuoW || y >= DuoH) continue;
-                    BlendInto(duo, DuoW, dx, y, tmp[k] / a, tmp[k + 1] / a, tmp[k + 2] / a, a);
+                    int x = ox + xs;
+                    if (x < 0 || x >= ScreenW) continue;
+                    double gxf = (midX + (xs - shift - midX) / sx) / S;
+                    if (gxf < 0 || gxf >= N) continue;
+                    uint c = chr[row + (int)gxf];
+                    if (c != 0) dst[drow + x] = c;
                 }
+            }
+
+            // efeitos por cima
+            foreach (var e in fx)
+            {
+                int bx = ox + Q(e.X * S), by = Q(e.Y * S);
+                for (int j = 0; j < e.Map.Length; j++)
+                    for (int i = 0; i < e.Map[j].Length; i++)
+                    {
+                        uint c = e.Cm(e.Map[j][i]);
+                        if (c != 0) FillPx(dst, bx + i * S, by + j * S, S, S, c);
+                    }
+            }
         }
 
-        private static void FillOpaque(double[] buf, int x, int y, int w, int h, uint c)
+        private static void FillPx(uint[] dst, int x, int y, int w, int h, uint c)
         {
-            for (int j = y; j < y + h; j++)
-                for (int i = x; i < x + w; i++)
-                    BlendInto(buf, DuoW, i, j, (c >> 16) & 255, (c >> 8) & 255, c & 255, 1);
+            int x0 = Math.Max(0, x), x1 = Math.Min(ScreenW, x + w), y0 = Math.Max(0, y), y1 = Math.Min(ScreenH, y + h);
+            for (int yy = y0; yy < y1; yy++)
+                for (int xx = x0; xx < x1; xx++) dst[yy * ScreenW + xx] = c;
         }
 
-        /// <summary>"Por cima" (source over) em cor pré-multiplicada.</summary>
-        private static void BlendInto(double[] buf, int w, int x, int y, double r, double g, double b, double a)
+        /// <summary>Preto com 38% de opacidade por cima do que já está desenhado.</summary>
+        private static void Shade(uint[] dst, int x, int x1, int y, int h)
         {
-            int h = buf.Length / 4 / w;
-            if (x < 0 || y < 0 || x >= w || y >= h) return;
-            int k = (y * w + x) * 4;
-            double ia = 1 - a;
-            buf[k] = r * a + buf[k] * ia;
-            buf[k + 1] = g * a + buf[k + 1] * ia;
-            buf[k + 2] = b * a + buf[k + 2] * ia;
-            buf[k + 3] = a + buf[k + 3] * ia;
+            const double a = 0.38;
+            for (int yy = Math.Max(0, y); yy < Math.Min(ScreenH, y + h); yy++)
+                for (int xx = Math.Max(0, x); xx < Math.Min(ScreenW, x1); xx++)
+                {
+                    uint d = dst[yy * ScreenW + xx];
+                    double da = (d >> 24) / 255.0;
+                    double oa = a + da * (1 - a);                 // opacidade final
+                    double k = da * (1 - a) / oa;                 // quanto da cor de baixo sobra
+                    uint r = (uint)Math.Round(((d >> 16) & 255) * k), g = (uint)Math.Round(((d >> 8) & 255) * k), b = (uint)Math.Round((d & 255) * k);
+                    dst[yy * ScreenW + xx] = ((uint)Math.Round(oa * 255) << 24) | (r << 16) | (g << 8) | b;
+                }
         }
     }
 }

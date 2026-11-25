@@ -28,7 +28,7 @@ namespace Pixo.Device
         private ushort[] _prev = new ushort[PanelW * PanelH];  // último quadro enviado
         private bool _hasPrev;                                 // false = o próximo quadro vai inteiro
         private readonly byte[] _sendBuf = new byte[PanelW * PanelH * 2];
-        private readonly bool[] _colBuf = new bool[PanelW];
+        private readonly byte[] _cmdBuf = new byte[6];
         private readonly List<DirtyRects.Rect> _rects = new List<DirtyRects.Rect>();
         public string PortName { get; }
 
@@ -89,16 +89,14 @@ namespace Pixo.Device
 
         private void Cmd(byte cmd, int x = 0, int y = 0, int ex = 0, int ey = 0)
         {
-            var b = new byte[]
-            {
-                (byte)(x >> 2),
-                (byte)(((x & 3) << 6) + (y >> 4)),
-                (byte)(((y & 15) << 4) + (ex >> 6)),
-                (byte)(((ex & 63) << 2) + (ey >> 8)),
-                (byte)(ey & 255),
-                cmd
-            };
-            _port.Write(b, 0, b.Length);
+            var b = _cmdBuf; // um comando por escrita, sempre sozinho (regra do firmware)
+            b[0] = (byte)(x >> 2);
+            b[1] = (byte)(((x & 3) << 6) + (y >> 4));
+            b[2] = (byte)(((y & 15) << 4) + (ex >> 6));
+            b[3] = (byte)(((ex & 63) << 2) + (ey >> 8));
+            b[4] = (byte)(ey & 255);
+            b[5] = cmd;
+            _port.Write(b, 0, 6);
         }
 
         private void SendOrientation()
@@ -192,8 +190,8 @@ namespace Pixo.Device
                 }
             }
 
-            // 2) acha os pedaços que mudaram (blocos pequenos: só bordas e detalhes que se mexeram)
-            DirtyRects.Find(px, _hasPrev ? _prev : null, PanelW, PanelH, _colBuf, _rects);
+            // 2) acha os pedaços que mudaram (retângulos justos: o USB cobra por pixel, não por comando)
+            DirtyRects.Find(px, _hasPrev ? _prev : null, PanelW, PanelH, _rects);
             if (_rects.Count == 0) return 0; // nada mudou
 
             // 3) envia bloco por bloco, do jeito que a tela aceita: primeiro o comando,

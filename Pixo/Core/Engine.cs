@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Windows;
 using System.Windows.Media;
@@ -48,6 +49,14 @@ namespace Pixo.Core
         public bool RotationPaused => !_autoRotate || DateTime.Now < _pausedUntil;
         public volatile BitmapSource Preview;
         public string PetState => (_screens.TryGetValue("bichinho", out var s) ? (s as PetScreen)?.State : null) ?? "feliz";
+
+        /// <summary>Quadros por segundo que chegaram na tela nos últimos ~2 s.</summary>
+        public double DisplayFps { get; private set; }
+        /// <summary>KB por segundo enviados pelo USB nos últimos ~2 s (o limite da tela é ~166 KB/s).</summary>
+        public double DisplayKBps { get; private set; }
+        private int _statFrames;
+        private long _statBytes;
+        private DateTime _statStart = DateTime.Now;
 
         public event Action StatusChanged;
 
@@ -117,8 +126,46 @@ namespace Pixo.Core
                 {
                     Disconnect();
                 }
-                Thread.Sleep(15);
+                // dorme até a hora do próximo quadro (no máximo 15 ms, para atender os comandos)
+                double wait = (_nextRender - DateTime.Now).TotalMilliseconds;
+                SleepPrecise(Math.Clamp(wait, 1, 15));
             }
+            if (_timer != IntPtr.Zero) { CloseHandle(_timer); _timer = IntPtr.Zero; }
+        }
+
+        // ---- espera precisa ----
+        // O Thread.Sleep do Windows anda de ~15,6 em ~15,6 ms: um quadro de 40 ms virava 47 ou 62 ms,
+        // e a animação ficava irregular. O timer de alta resolução acorda na hora certa (Windows 10 1803+).
+        private IntPtr _timer;
+        private bool _timerTried;
+
+        [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+        private static extern IntPtr CreateWaitableTimerExW(IntPtr attributes, string name, uint flags, uint access);
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool SetWaitableTimer(IntPtr timer, ref long dueTime, int period, IntPtr completion, IntPtr arg, bool resume);
+        [DllImport("kernel32.dll")]
+        private static extern uint WaitForSingleObject(IntPtr handle, uint milliseconds);
+        [DllImport("kernel32.dll")]
+        private static extern bool CloseHandle(IntPtr handle);
+
+        private void SleepPrecise(double ms)
+        {
+            if (!_timerTried)
+            {
+                _timerTried = true;
+                try { _timer = CreateWaitableTimerExW(IntPtr.Zero, null, 0x2 /* HIGH_RESOLUTION */, 0x1F0003 /* ALL_ACCESS */); }
+                catch { _timer = IntPtr.Zero; }
+            }
+            if (_timer != IntPtr.Zero)
+            {
+                long due = -(long)(ms * 10_000); // negativo = relativo, em unidades de 100 ns
+                if (SetWaitableTimer(_timer, ref due, 0, IntPtr.Zero, IntPtr.Zero, false))
+                {
+                    WaitForSingleObject(_timer, 1000);
+                    return;
+                }
+            }
+            Thread.Sleep((int)Math.Ceiling(ms));
         }
 
         private void EnsureConnected()
@@ -292,7 +339,12 @@ namespace Pixo.Core
             _rtb ??= new RenderTargetBitmap(TuringDisplay.W, TuringDisplay.H, 96, 96, PixelFormats.Pbgra32);
             _rtb.Clear();
             _rtb.Render(BuildVisual(sc, ctx));
-            _nextRender = DateTime.Now + sc.Interval;
+            // ritmo fixo: o próximo quadro sai um intervalo depois do anterior (e não depois do fim
+            // do envio); se o envio atrasou mais que um intervalo, recomeça a contar de agora
+            var now = DateTime.Now;
+            _nextRender = _nextRender == DateTime.MinValue || now - _nextRender > sc.Interval
+                ? now + sc.Interval
+                : _nextRender + sc.Interval;
             _rtb.CopyPixels(_frameBuf, TuringDisplay.W * 4, 0);
 
             // a prévia da janela é uma cópia congelada, feita no máximo 1 vez por segundo
@@ -305,7 +357,17 @@ namespace Pixo.Core
             }
 
             if (_display == null || _screenOff) return;
-            _display.SendFrame(_frameBuf, _cfg.Flipped);
+            int px = _display.SendFrame(_frameBuf, _cfg.Flipped);
+
+            // estatística para a janela (aba Tela física)
+            if (px > 0) { _statFrames++; _statBytes += px * 2L; }
+            double sec = (DateTime.Now - _statStart).TotalSeconds;
+            if (sec >= 2)
+            {
+                DisplayFps = _statFrames / sec;
+                DisplayKBps = _statBytes / 1024.0 / sec;
+                _statFrames = 0; _statBytes = 0; _statStart = DateTime.Now;
+            }
         }
 
         // reaproveitados a cada quadro (evita pausas de limpeza de memória)

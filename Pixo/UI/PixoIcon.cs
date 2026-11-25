@@ -58,13 +58,7 @@ namespace Pixo.UI
             return rtb;
         }
 
-        /// <summary>Um quadro do Fred & Dengo (60×36; a janela amplia sem suavizar).</summary>
-        public static BitmapSource PetsFrame(string state, double pos)
-        {
-            var argb = Pets.RenderDuo(state, pos);
-            var bmp = BitmapSource.Create(Pets.DuoW, Pets.DuoH, 96, 96, PixelFormats.Bgra32, null, argb, Pets.DuoW * 4);
-            bmp.Freeze();
-            return bmp;
-        }
+        /// <summary>Um quadro do Fred & Dengo (360×216), igual ao da tela. A imagem é reaproveitada.</summary>
+        public static BitmapSource PetsFrame(string state, double pos) => D.PetsBitmap(state, pos);
     }
 }

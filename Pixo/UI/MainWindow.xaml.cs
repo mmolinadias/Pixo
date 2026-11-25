@@ -152,6 +152,8 @@ namespace Pixo.UI
             HomeScreen.Text = "Agora: " + eng.CurrentScreenName + (eng.RotationPaused ? " · rotação pausada" : "");
             PauseBtnIcon.Kind = eng.RotationPaused ? "play" : "pause";
             PauseBtnText.Text = eng.RotationPaused ? "Continuar rotação" : "Pausar rotação";
+            if (PageDevice.Visibility == Visibility.Visible)
+                PerfText.Text = eng.Connected ? $"{eng.DisplayFps:0} quadros/s · {eng.DisplayKBps:0} KB/s" : "—";
 
             if (!eng.Connected)
             {

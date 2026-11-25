@@ -520,7 +520,13 @@ namespace Pixo.Render
 
         private DateTime _frameStart = DateTime.Now;
 
-        public override void OnShow() { _nextFrame = DateTime.MinValue; }
+        // troca de estado suave: de onde o corpo vinha e quando trocou
+        private string _from;
+        private double _fromPos;
+        private DateTime _changedAt = DateTime.MinValue;
+        private const double GlideMs = 280;
+
+        public override void OnShow() { _nextFrame = DateTime.MinValue; _from = null; }
 
         /// <summary>Posição atual na animação, com fração (ex.: 3,4 = 40% entre a pose 3 e a 4).</summary>
         private double Position()
@@ -581,6 +587,7 @@ namespace Pixo.Render
             }
             else if (target != _state && (info.Loop || _oneShotDone || target == "susto" || target == "comemora"))
             {
+                _from = _state; _fromPos = Position(); _changedAt = now; // o corpo desliza da pose antiga
                 _state = target; _frame = 0; _oneShotDone = false;
             }
             else
@@ -603,7 +610,9 @@ namespace Pixo.Render
             D.Chip(dc, info.Chip, 132, 10, 20, Pal.S2, Pal.Accent, 12, 700, 8);
 
             // a dupla na almofada (360×216, pixel art 6×)
-            D.PetsDuo(dc, _state, Position(), 60, 40);
+            double mix = _from == null ? 1 : (DateTime.Now - _changedAt).TotalMilliseconds / GlideMs;
+            if (mix >= 1) _from = null;
+            D.PetsDuo(dc, _state, Position(), 60, 40, true, _from, _fromPos, Math.Min(1, mix));
 
             // nomes embaixo de cada um
             D.Text(dc, cfg.PetName1, 112, 258, 100, 16, 13, 700, Pal.Ink, Align.Center);
