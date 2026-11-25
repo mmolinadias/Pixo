@@ -1,0 +1,35 @@
+# Publica uma versão do Pixo: ao enviar uma tag "v1.2.3" (que tem que bater com o <Version> do Pixo.csproj),
+# gera o instalador com o Velopack e cria a Release no GitHub. Os Pixos instalados se atualizam sozinhos.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Confere a versão
+        shell: pwsh
+        run: |
+          [xml]$proj = Get-Content 'Pixo\Pixo.csproj'
+          $version = ($proj.Project.PropertyGroup | Where-Object { $_.Version } | Select-Object -First 1).Version
+          if ("v$version" -ne "${{ github.ref_name }}") { throw "A tag ${{ github.ref_name }} não bate com o <Version> $version do Pixo.csproj" }
+
+      - name: Instalador e Release
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          dotnet tool install -g vpk --version 1.2.161
+          .\release.ps1 -Upload

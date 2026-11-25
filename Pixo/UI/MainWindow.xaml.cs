@@ -118,6 +118,7 @@ namespace Pixo.UI
             // Geral
             StartupSwitch.IsChecked = Startup.IsEnabled();
             ApiPortBox.Text = _cfg.ApiPort.ToString();
+            AboutVersion.Text = "Pixo " + Updater.Version;
 
             RefreshPaths();
             WelcomeBar.IsOpen = welcome;
@@ -334,6 +335,7 @@ namespace Pixo.UI
 
         private void RefreshApiPage()
         {
+            RefreshUpdate();
             ApiStatusText.Text = PixoApi.Port > 0 ? $"Ouvindo em http://127.0.0.1:{PixoApi.Port} (só este PC)"
                 : PixoApi.Error ?? "Desligada";
             bool on = ClaudeHooks.IsInstalled(_cfg.ApiPort);
@@ -343,6 +345,24 @@ namespace Pixo.UI
                     ? "Ligado: o Fred e o Dengo avisam quando o Claude Code te chama ou termina"
                     : "Quando o Claude Code precisa de você ou termina, o Fred e o Dengo avisam na tela";
         }
+
+        // ---------------- Atualizações ----------------
+
+        private void RefreshUpdate()
+        {
+            UpdateStatusText.Text = Updater.Status;
+            UpdateCheckButton.IsEnabled = Updater.Installed && !Updater.ReadyToApply;
+            UpdateApplyButton.Visibility = Updater.ReadyToApply ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        private async void OnUpdateCheck(object sender, RoutedEventArgs e)
+        {
+            UpdateCheckButton.IsEnabled = false;
+            await Updater.Check();
+            RefreshUpdate();
+        }
+
+        private void OnUpdateApply(object sender, RoutedEventArgs e) => Updater.ApplyNow();
 
         private void ClaudeMessage(string text)
         {

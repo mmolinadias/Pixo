@@ -18,7 +18,9 @@
     <RootNamespace>Pixo</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Assets\pixo.ico</ApplicationIcon>
-    <Version>1.0.0</Version>
+    <Version>1.1.0</Version>
+    <!-- entrada própria (Program.cs): o Velopack precisa rodar antes do WPF -->
+    <StartupObject>Pixo.Program</StartupObject>
     <Product>Pixo</Product>
   </PropertyGroup>
 
@@ -28,10 +30,18 @@
     <PackageReference Include="Vosk" Version="0.3.38" />
     <PackageReference Include="NAudio" Version="2.2.1" />
     <PackageReference Include="System.IO.Ports" Version="10.0.3" />
+    <!-- instalador e atualização automática; mesma versão da ferramenta vpk -->
+    <PackageReference Include="Velopack" Version="1.2.161" />
   </ItemGroup>
 
   <ItemGroup>
     <Resource Include="Assets\pixo.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- App.xaml vira uma página comum: quem cria o App é o Program.Main -->
+    <ApplicationDefinition Remove="App.xaml" />
+    <Page Include="App.xaml" />
   </ItemGroup>
 
 </Project>

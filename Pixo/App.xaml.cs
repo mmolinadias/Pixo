@@ -58,6 +58,15 @@ namespace Pixo
             Engine = new Engine(Cfg);
             Engine.Start();
             PixoApi.Start(() => Cfg, action => Engine.Post(action));
+            Updater.Start();
+
+            // "Iniciar com o Windows": corrige o caminho (ex.: veio do C:\Pixo para o instalado) e, na primeira
+            // vez num PC instalado pelo Setup, já deixa ligado (dá para desligar na aba Geral)
+            if (Program.IsAdmin())
+            {
+                if (Config.IsFirstRun && Updater.Installed && !Core.Startup.IsEnabled()) Core.Startup.Enable();
+                else Core.Startup.FixPath();
+            }
 
             Voice = new VoiceListener(Cfg, action => Engine.Post(action, fromVoice: true));
             // se a última carga do modelo de voz derrubou o app, abre com a voz desligada
@@ -97,6 +106,7 @@ namespace Pixo
             try { WeatherService.Stop(); } catch { }
             try { AcService.Stop(); } catch { }
             try { PixoApi.Stop(); } catch { }
+            try { Updater.Stop(); Updater.ApplyOnExit(); } catch { }
             _tray?.Dispose();
             _main?.Close();
             Shutdown();

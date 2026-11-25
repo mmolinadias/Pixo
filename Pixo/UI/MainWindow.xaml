@@ -575,6 +575,18 @@
                                 </ui:CardControl.Header>
                                 <ui:Button Content="Abrir" Click="OnOpenConfigFolder" />
                             </ui:CardControl>
+                            <ui:CardControl Style="{StaticResource Row}">
+                                <ui:CardControl.Header>
+                                    <StackPanel>
+                                        <TextBlock Text="Atualizações" Style="{StaticResource RowTitle}" />
+                                        <TextBlock x:Name="UpdateStatusText" Text="—" Style="{StaticResource RowHint}" TextWrapping="Wrap" MaxWidth="360" />
+                                    </StackPanel>
+                                </ui:CardControl.Header>
+                                <StackPanel Orientation="Horizontal">
+                                    <ui:Button x:Name="UpdateCheckButton" Content="Verificar agora" Click="OnUpdateCheck" Margin="0,0,8,0" />
+                                    <ui:Button x:Name="UpdateApplyButton" Content="Reiniciar e atualizar" Appearance="Primary" Click="OnUpdateApply" Visibility="Collapsed" />
+                                </StackPanel>
+                            </ui:CardControl>
                             <TextBlock Text="Pixo API" Style="{StaticResource SectionTitle}" />
                             <TextBlock Text="Programas deste PC podem mandar avisos para a tela. Ex.: curl -X POST http://127.0.0.1:7480/mensagem -d &quot;Pizza chegou!&quot;" Style="{StaticResource RowHint}" TextWrapping="Wrap" Margin="0,0,0,8" />
                             <ui:CardControl Style="{StaticResource Row}">
@@ -616,7 +628,7 @@
                                     <StackPanel Orientation="Horizontal">
                                         <Image x:Name="AboutLogo" Width="40" Height="40" Margin="0,0,14,0" />
                                         <StackPanel VerticalAlignment="Center">
-                                            <TextBlock Text="Pixo 1.0" Style="{StaticResource RowTitle}" />
+                                            <TextBlock x:Name="AboutVersion" Text="Pixo" Style="{StaticResource RowTitle}" />
                                             <TextBlock Text="Para a Turing Smart Screen 3,5&quot;. Feito com carinho pelo Fred e pelo Dengo." Style="{StaticResource RowHint}" />
                                         </StackPanel>
                                     </StackPanel>

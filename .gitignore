@@ -22,3 +22,6 @@ Desktop.ini
 
 # Arquivos gerados pelo Claude (referências, imagens, zips)
 Claude outputs/
+
+# Instalador (gerado pelo release.ps1)
+releases/
