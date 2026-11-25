@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Windows;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 
 namespace Pixo.Render
 {
@@ -166,6 +167,28 @@ namespace Pixo.Render
                 dc.DrawGeometry(color, null, g);
             }
             dc.Pop();
+        }
+
+        /// <summary>Barra em "bloquinhos" retrô (usada na tela dos bichinhos).</summary>
+        public static void SegBar(DrawingContext dc, double x, double y, double w, double h, int n, double pct, Brush color)
+        {
+            double bw = (w - (n - 1) * 2) / n;
+            int on = (int)Math.Floor(Math.Clamp(pct, 0, 100) / 100 * n + 0.5);
+            for (int i = 0; i < n; i++)
+                dc.DrawRoundedRectangle(i < on ? color : Pal.Line, null,
+                    new Rect(Math.Floor(x + i * (bw + 2) + 0.5), y, Math.Floor(bw + 0.5), h), 2, 2);
+        }
+
+        /// <summary>Fred & Dengo (pixel art) ampliados 6× sem suavização, com o canto em (x, y).</summary>
+        public static void PetsDuo(DrawingContext dc, string state, double pos, double x, double y, bool cushion = true)
+        {
+            var argb = Pets.RenderDuo(state, pos, cushion);
+            var bmp = BitmapSource.Create(Pets.DuoW, Pets.DuoH, 96, 96, PixelFormats.Bgra32, null, argb, Pets.DuoW * 4);
+            bmp.Freeze();
+            var group = new DrawingGroup();
+            RenderOptions.SetBitmapScalingMode(group, BitmapScalingMode.NearestNeighbor);
+            group.Children.Add(new ImageDrawing(bmp, new Rect(x, y, Pets.DuoW * Pets.Scale, Pets.DuoH * Pets.Scale)));
+            dc.DrawDrawing(group);
         }
 
         public static void Dot(DrawingContext dc, double x, double y, double size, Brush color)

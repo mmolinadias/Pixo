@@ -9,6 +9,7 @@ publish/
 # Arquivos de diagnóstico gerados pelo Pixo
 sensores.txt
 voz.txt
+jogo.txt
 
 # Modelos de voz (são grandes: baixe em alphacephei.com/vosk/models)
 modelo-voz/

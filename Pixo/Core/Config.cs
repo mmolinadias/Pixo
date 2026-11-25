@@ -73,9 +73,14 @@ namespace Pixo.Core
         private bool _onlySpotify;
         public bool OnlySpotify { get => _onlySpotify; set => Set(ref _onlySpotify, value); }
 
-        // ---------------- Bichinho ----------------
-        private string _petName = "Bit";
-        public string PetName { get => _petName; set => Set(ref _petName, string.IsNullOrWhiteSpace(value) ? "Bit" : value.Trim()); }
+        // ---------------- Bichinhos (Fred & Dengo) ----------------
+        private string _petName1 = "Fred";
+        /// <summary>Nome do cachorro.</summary>
+        public string PetName1 { get => _petName1; set => Set(ref _petName1, string.IsNullOrWhiteSpace(value) ? "Fred" : value.Trim()); }
+
+        private string _petName2 = "Dengo";
+        /// <summary>Nome do gato.</summary>
+        public string PetName2 { get => _petName2; set => Set(ref _petName2, string.IsNullOrWhiteSpace(value) ? "Dengo" : value.Trim()); }
 
         private double _petSleepMinutes = 5;
         public double PetSleepMinutes { get => _petSleepMinutes; set => Set(ref _petSleepMinutes, Math.Clamp(Math.Round(value), 1, 120)); }
@@ -175,6 +180,7 @@ namespace Pixo.Core
             new VoiceCommand { Phrase = "downloads", Action = "downloads" },
             new VoiceCommand { Phrase = "baixando", Action = "downloads" },
             new VoiceCommand { Phrase = "bichinho", Action = "bichinho" },
+            new VoiceCommand { Phrase = "bichinhos", Action = "bichinho" },
             new VoiceCommand { Phrase = "jogo", Action = "gamer" },
             new VoiceCommand { Phrase = "imagem", Action = "imagem" },
             new VoiceCommand { Phrase = "foto", Action = "imagem" },
@@ -208,7 +214,7 @@ namespace Pixo.Core
             "musica" => "Música",
             "notificacoes" => "Notificações",
             "downloads" => "Downloads",
-            "bichinho" => "Bichinho",
+            "bichinho" => "Bichinhos",
             "imagem" => "Imagem",
             "relogio" => "Relógio",
             "gamer" => "Modo Gamer",
@@ -221,7 +227,7 @@ namespace Pixo.Core
             "musica" => "Só aparece quando algo está tocando",
             "notificacoes" => "Só aparece quando tem notificação",
             "downloads" => "Só aparece quando tem download",
-            "bichinho" => "O Bit, que reage ao seu PC",
+            "bichinho" => "Fred e Dengo, que reagem ao seu PC",
             "imagem" => "Suas fotos, uma por vez",
             "relogio" => "Hora e data em letras grandes",
             _ => ""
@@ -247,7 +253,7 @@ namespace Pixo.Core
             ("musica", "Mostrar Música"),
             ("notificacoes", "Mostrar Notificações"),
             ("downloads", "Mostrar Downloads"),
-            ("bichinho", "Mostrar Bichinho"),
+            ("bichinho", "Mostrar Bichinhos"),
             ("imagem", "Mostrar Imagem"),
             ("relogio", "Mostrar Relógio"),
             ("gamer", "Mostrar Modo Gamer"),

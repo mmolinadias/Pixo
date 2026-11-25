@@ -58,19 +58,13 @@ namespace Pixo.UI
             return rtb;
         }
 
-        /// <summary>Um quadro do Bit (180×180) para a prévia na janela.</summary>
-        public static BitmapSource BitFrame(string state, int frame)
+        /// <summary>Um quadro do Fred & Dengo (60×36; a janela amplia sem suavizar).</summary>
+        public static BitmapSource PetsFrame(string state, double pos)
         {
-            var dv = new DrawingVisual();
-            using (var dc = dv.RenderOpen())
-            {
-                dc.DrawRectangle(Pal.Bg, null, new Rect(0, 0, Bit.Size, Bit.Size));
-                Bit.Draw(dc, state, frame);
-            }
-            var rtb = new RenderTargetBitmap(Bit.Size, Bit.Size, 96, 96, PixelFormats.Pbgra32);
-            rtb.Render(dv);
-            rtb.Freeze();
-            return rtb;
+            var argb = Pets.RenderDuo(state, pos);
+            var bmp = BitmapSource.Create(Pets.DuoW, Pets.DuoH, 96, 96, PixelFormats.Bgra32, null, argb, Pets.DuoW * 4);
+            bmp.Freeze();
+            return bmp;
         }
     }
 }

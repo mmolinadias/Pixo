@@ -34,6 +34,9 @@ namespace Pixo
 
             base.OnStartup(e);
 
+            // menos pausas longas de limpeza de memória (deixa a animação da tela mais lisa)
+            System.Runtime.GCSettings.LatencyMode = System.Runtime.GCLatencyMode.SustainedLowLatency;
+
             try
             {
                 Wpf.Ui.Appearance.ApplicationAccentColorManager.Apply(

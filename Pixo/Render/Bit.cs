@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Windows;
 using System.Windows.Media;
 
@@ -48,7 +49,67 @@ namespace Pixo.Render
             public int Btn;
             public Brush Ant = Pal.B("#42cfef");
             public List<object[]> Fx = new List<object[]>();
+            // para a interpolação dos braços entre duas poses
+            public string ArmsNext;
+            public double ArmT;
         }
+
+        private static double Lerp(double a, double b, double t) => a + (b - a) * t;
+
+        /// <summary>
+        /// Mistura duas poses: tudo que é medida (posição, escala, inclinação, olhar, efeitos)
+        /// desliza de uma para outra; o que é "estado" (olhos, boca) troca na metade do caminho.
+        /// </summary>
+        private static Pose Blend(Pose a, Pose b, double t, bool wrapped)
+        {
+            if (t <= 0.001) return a;
+            var p = t < 0.5 ? a : b;
+            var r = new Pose
+            {
+                Dy = Lerp(a.Dy, b.Dy, t), Sx = Lerp(a.Sx, b.Sx, t), Sy = Lerp(a.Sy, b.Sy, t),
+                Tilt = Lerp(a.Tilt, b.Tilt, t), Look = Lerp(a.Look, b.Look, t), LookY = Lerp(a.LookY, b.LookY, t),
+                Eyes = p.Eyes, Mouth = p.Mouth, Hot = p.Hot, Phones = p.Phones, Btn = p.Btn, Ant = p.Ant,
+                Arms = a.Arms, ArmsNext = b.Arms, ArmT = t,
+            };
+
+            // efeitos: mesma lista nas duas poses -> interpola os números
+            if (a.Fx.Count == b.Fx.Count && a.Fx.Select(x => x[0]).SequenceEqual(b.Fx.Select(x => x[0])))
+            {
+                for (int i = 0; i < a.Fx.Count; i++)
+                {
+                    var fa = a.Fx[i];
+                    var fb = b.Fx[i];
+                    var kind = (string)fa[0];
+                    var item = (object[])fa.Clone();
+                    for (int j = 1; j < fa.Length; j++)
+                    {
+                        if (fa[j] is double da && fb[j] is double db)
+                        {
+                            if ((kind == "heat" || kind == "confetti") && j == 1)
+                                item[j] = da + t;                      // contador de quadro: avança suave
+                            else if (Math.Abs(db - da) > 25 || wrapped && Math.Abs(db - da) > 12)
+                                item[j] = t < 0.5 ? da : db;           // "pulo" do loop: não arrasta pela tela
+                            else
+                                item[j] = Lerp(da, db, t);
+                        }
+                    }
+                    r.Fx.Add(item);
+                }
+            }
+            else r.Fx = p.Fx;
+            return r;
+        }
+
+        private static double[][] ArmsFor(string arms, double A, double Bh) => arms switch
+        {
+            "down" => new[] { new[] { -A + 2, 12, 0.45 }, new[] { A - 2, 12, -0.45 } },
+            "tapA" => new[] { new[] { -A + 4, 18, 0.9 }, new[] { A - 4, 14, -0.6 } },
+            "tapB" => new[] { new[] { -A + 4, 14, 0.6 }, new[] { A - 4, 18, -0.9 } },
+            "up" => new[] { new[] { -A - 6, -Bh * 0.35, -0.5 }, new[] { A + 6, -Bh * 0.35, 0.5 } },
+            "swayL" => new[] { new[] { -A - 2, -4, -0.3 }, new[] { A - 2, 14, -0.5 } },
+            "swayR" => new[] { new[] { -A + 2, 14, 0.5 }, new[] { A + 2, -4, 0.3 } },
+            _ => null
+        };
 
         private static Pose MakePose(string state, int f)
         {
@@ -244,11 +305,22 @@ namespace Pixo.Render
         // ---------------- desenho ----------------
 
         /// <summary>Desenha o Bit no estado e quadro indicados, com origem em (0,0) e 180×180.</summary>
-        public static void Draw(DrawingContext dc, string state, int f)
+        public static void Draw(DrawingContext dc, string state, int f) => Draw(dc, state, (double)f);
+
+        /// <summary>
+        /// Desenha o Bit numa posição "entre quadros": 3,4 = 40% do caminho entre a pose 3 e a 4.
+        /// É isso que deixa a animação fluida.
+        /// </summary>
+        public static void Draw(DrawingContext dc, string state, double pos)
         {
             if (!States.ContainsKey(state)) state = "feliz";
-            f = Math.Clamp(f, 0, States[state].Durations.Length - 1);
-            var p = MakePose(state, f);
+            var info = States[state];
+            int n = info.Durations.Length;
+            pos = Math.Clamp(pos, 0, n - 1 + (info.Loop ? 0.999 : 0));
+            int f = (int)Math.Floor(pos);
+            double t = pos - f;
+            int f2 = info.Loop ? (f + 1) % n : Math.Min(f + 1, n - 1);
+            var p = f2 == f ? MakePose(state, f) : Blend(MakePose(state, f), MakePose(state, f2), t, f2 < f);
 
             double G = 152, A = 52 * p.Sx, Bh = 46 * p.Sy;
             double cx = 90, cy = G - Bh + p.Dy;
@@ -267,16 +339,16 @@ namespace Pixo.Render
             Ell(dc, cx + 21, G + p.Dy - 3, 12, 6.5, 0, shade);
 
             // braços atrás do corpo
-            double[][] arms = p.Arms switch
+            var arms = ArmsFor(p.Arms, A, Bh);
+            var armsNext = p.ArmsNext != null ? ArmsFor(p.ArmsNext, A, Bh) : null;
+            if (arms != null && armsNext != null && p.ArmT > 0)
             {
-                "down" => new[] { new[] { -A + 2, 12, 0.45 }, new[] { A - 2, 12, -0.45 } },
-                "tapA" => new[] { new[] { -A + 4, 18, 0.9 }, new[] { A - 4, 14, -0.6 } },
-                "tapB" => new[] { new[] { -A + 4, 14, 0.6 }, new[] { A - 4, 18, -0.9 } },
-                "up" => new[] { new[] { -A - 6, -Bh * 0.35, -0.5 }, new[] { A + 6, -Bh * 0.35, 0.5 } },
-                "swayL" => new[] { new[] { -A - 2, -4, -0.3 }, new[] { A - 2, 14, -0.5 } },
-                "swayR" => new[] { new[] { -A + 2, 14, 0.5 }, new[] { A + 2, -4, 0.3 } },
-                _ => null
-            };
+                // braços deslizam entre as duas poses
+                for (int i = 0; i < arms.Length; i++)
+                    for (int j = 0; j < 3; j++)
+                        arms[i][j] = Lerp(arms[i][j], armsNext[i][j], p.ArmT);
+            }
+            else if (arms == null && p.ArmT >= 0.5) arms = armsNext;
             if (arms != null)
                 foreach (var a in arms) Ell(dc, cx + a[0], cy + a[1], 8, 12, a[2], shade);
 

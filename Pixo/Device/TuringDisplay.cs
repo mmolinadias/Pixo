@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO.Ports;
 using System.Linq;
 using Microsoft.Win32;
@@ -22,7 +23,13 @@ namespace Pixo.Device
                            CmdBrightness = 110, CmdOrientation = 121, CmdBitmap = 197;
 
         private readonly SerialPort _port;
-        private ushort[] _last;          // último quadro enviado (no formato do painel)
+        // Buffers reaproveitados a cada quadro (evita pausas de limpeza de memória do .NET)
+        private ushort[] _cur = new ushort[PanelW * PanelH];   // quadro que está sendo montado
+        private ushort[] _prev = new ushort[PanelW * PanelH];  // último quadro enviado
+        private bool _hasPrev;                                 // false = o próximo quadro vai inteiro
+        private readonly byte[] _sendBuf = new byte[PanelW * PanelH * 2];
+        private readonly bool[] _colBuf = new bool[PanelW];
+        private readonly List<DirtyRects.Rect> _rects = new List<DirtyRects.Rect>();
         public string PortName { get; }
 
         private TuringDisplay(string portName)
@@ -104,7 +111,7 @@ namespace Pixo.Device
             _port.Write(b, 0, b.Length);
         }
 
-        public void Clear() { Cmd(CmdClear); _last = null; }
+        public void Clear() { Cmd(CmdClear); _hasPrev = false; }
         public void ScreenOn() => Cmd(CmdScreenOn);
         public void ScreenOff() => Cmd(CmdScreenOff);
 
@@ -116,7 +123,7 @@ namespace Pixo.Device
         }
 
         /// <summary>Força o próximo quadro a ser enviado inteiro.</summary>
-        public void Invalidate() => _last = null;
+        public void Invalidate() => _hasPrev = false;
 
         // ---------------- correção de cor ----------------
 
@@ -143,15 +150,15 @@ namespace Pixo.Device
                 v = (v - 0.5) * c + 0.5;            // contraste em torno do cinza médio
                 _lut[i] = (byte)Math.Clamp((int)Math.Round(v * 255), 0, 255);
             }
-            _last = null; // reenvia tudo com as cores novas
+            _hasPrev = false; // reenvia tudo com as cores novas
             return true;
         }
 
         private bool TuneActive => _satFixed != 256 || _lutContrast != 100 || _lutGamma != 100;
 
         /// <summary>
-        /// Envia um quadro 480×320 (BGRA, 4 bytes por pixel). Só o retângulo que mudou
-        /// desde o último quadro é enviado. Devolve quantos pixels foram enviados.
+        /// Envia um quadro 480×320 (BGRA, 4 bytes por pixel). Só as faixas que mudaram
+        /// desde o último quadro são enviadas. Devolve quantos pixels foram enviados.
         /// </summary>
         public int SendFrame(byte[] bgra, bool flipped)
         {
@@ -159,7 +166,7 @@ namespace Pixo.Device
             bool tune = TuneActive;
             int sat = _satFixed;
             // 1) gira para o formato do painel (320×480) e converte para RGB565
-            var px = new ushort[PanelW * PanelH];
+            var px = _cur;
             for (int py = 0; py < PanelH; py++)
             {
                 for (int pxl = 0; pxl < PanelW; pxl++)
@@ -185,49 +192,35 @@ namespace Pixo.Device
                 }
             }
 
-            // 2) acha o retângulo que mudou
-            int x0 = 0, y0 = 0, x1 = PanelW - 1, y1 = PanelH - 1;
-            if (_last != null)
+            // 2) acha os pedaços que mudaram (blocos pequenos: só bordas e detalhes que se mexeram)
+            DirtyRects.Find(px, _hasPrev ? _prev : null, PanelW, PanelH, _colBuf, _rects);
+            if (_rects.Count == 0) return 0; // nada mudou
+
+            // 3) envia bloco por bloco, do jeito que a tela aceita: primeiro o comando,
+            //    depois os pixels daquele bloco (a tela reinicia se receber vários comandos colados)
+            int sent = 0;
+            foreach (var r in _rects)
             {
-                x0 = PanelW; y0 = PanelH; x1 = -1; y1 = -1;
-                for (int y = 0; y < PanelH; y++)
+                int k = 0;
+                for (int y = r.Y0; y <= r.Y1; y++)
                 {
                     int row = y * PanelW;
-                    for (int x = 0; x < PanelW; x++)
+                    for (int x = r.X0; x <= r.X1; x++)
                     {
-                        if (px[row + x] != _last[row + x])
-                        {
-                            if (x < x0) x0 = x;
-                            if (x > x1) x1 = x;
-                            if (y < y0) y0 = y;
-                            y1 = y;
-                        }
+                        ushort v = px[row + x];
+                        _sendBuf[k++] = (byte)(v & 0xFF);
+                        _sendBuf[k++] = (byte)(v >> 8);
                     }
                 }
-                if (x1 < 0) return 0; // nada mudou
+                Cmd(CmdBitmap, r.X0, r.Y0, r.X1, r.Y1);
+                _port.Write(_sendBuf, 0, k);
+                sent += r.Pixels;
             }
 
-            // 3) envia
-            int w = x1 - x0 + 1, h = y1 - y0 + 1;
-            var data = new byte[w * h * 2];
-            int k = 0;
-            for (int y = y0; y <= y1; y++)
-            {
-                int row = y * PanelW;
-                for (int x = x0; x <= x1; x++)
-                {
-                    ushort v = px[row + x];
-                    data[k++] = (byte)(v & 0xFF);
-                    data[k++] = (byte)(v >> 8);
-                }
-            }
-            Cmd(CmdBitmap, x0, y0, x1, y1);
-            int chunk = w * 8 * 2 * 8;
-            for (int i = 0; i < data.Length; i += chunk)
-                _port.Write(data, i, Math.Min(chunk, data.Length - i));
-
-            _last = px;
-            return w * h;
+            // 4) o quadro atual vira o "anterior" (troca os buffers, sem copiar)
+            var tmp = _prev; _prev = _cur; _cur = tmp;
+            _hasPrev = true;
+            return sent;
         }
 
         public void Dispose()

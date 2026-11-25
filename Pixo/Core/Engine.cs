@@ -72,7 +72,9 @@ namespace Pixo.Core
             NotificationService.NewArrived += () => (_screens["bichinho"] as PetScreen)?.React("susto");
             DownloadService.Finished += () => (_screens["bichinho"] as PetScreen)?.React("comemora");
 
-            _thread = new Thread(Run) { IsBackground = true, Name = "Pixo.Engine" };
+            // prioridade acima do normal: com o PC carregado (jogos, renderização), o Windows
+            // não pausa o envio para a tela no meio de um quadro
+            _thread = new Thread(Run) { IsBackground = true, Name = "Pixo.Engine", Priority = ThreadPriority.AboveNormal };
             _thread.SetApartmentState(ApartmentState.STA);
             _thread.Start();
         }
@@ -179,7 +181,7 @@ namespace Pixo.Core
             if (_current != sc) sc.OnShow();
             _current = sc;
             if (resetTimer) _shownAt = DateTime.Now;
-            _display?.Invalidate();
+            // sem reenvio completo: o driver compara com o quadro anterior e só manda o que mudou
             _nextRender = DateTime.MinValue;
             StatusChanged?.Invoke();
         }
@@ -286,23 +288,31 @@ namespace Pixo.Core
                 Paused = RotationPaused && !_inGame
             };
 
-            var frame = Render(sc, ctx);
+            // desenha sempre na mesma imagem (não cria uma nova a cada quadro)
+            _rtb ??= new RenderTargetBitmap(TuringDisplay.W, TuringDisplay.H, 96, 96, PixelFormats.Pbgra32);
+            _rtb.Clear();
+            _rtb.Render(BuildVisual(sc, ctx));
             _nextRender = DateTime.Now + sc.Interval;
+            _rtb.CopyPixels(_frameBuf, TuringDisplay.W * 4, 0);
 
+            // a prévia da janela é uma cópia congelada, feita no máximo 1 vez por segundo
             if ((DateTime.Now - _lastPreview).TotalMilliseconds > 900)
             {
-                Preview = frame;
+                var copy = BitmapSource.Create(TuringDisplay.W, TuringDisplay.H, 96, 96, PixelFormats.Pbgra32, null, _frameBuf, TuringDisplay.W * 4);
+                copy.Freeze();
+                Preview = copy;
                 _lastPreview = DateTime.Now;
             }
 
             if (_display == null || _screenOff) return;
-            var px = new byte[TuringDisplay.W * TuringDisplay.H * 4];
-            frame.CopyPixels(px, TuringDisplay.W * 4, 0);
-            _display.SendFrame(px, _cfg.Flipped);
+            _display.SendFrame(_frameBuf, _cfg.Flipped);
         }
 
-        /// <summary>Desenha uma tela num bitmap 480×320 (também usado pela prévia da janela).</summary>
-        public static BitmapSource Render(Screen sc, FrameCtx ctx)
+        // reaproveitados a cada quadro (evita pausas de limpeza de memória)
+        private readonly byte[] _frameBuf = new byte[TuringDisplay.W * TuringDisplay.H * 4];
+        private RenderTargetBitmap _rtb;
+
+        private static DrawingVisual BuildVisual(Screen sc, FrameCtx ctx)
         {
             var dv = new DrawingVisual();
             RenderOptions.SetBitmapScalingMode(dv, BitmapScalingMode.HighQuality);
@@ -314,8 +324,14 @@ namespace Pixo.Core
                 sc.Draw(dc, ctx);
                 dc.Pop();
             }
+            return dv;
+        }
+
+        /// <summary>Desenha uma tela num bitmap 480×320 novo (para usos avulsos).</summary>
+        public static BitmapSource Render(Screen sc, FrameCtx ctx)
+        {
             var rtb = new RenderTargetBitmap(TuringDisplay.W, TuringDisplay.H, 96, 96, PixelFormats.Pbgra32);
-            rtb.Render(dv);
+            rtb.Render(BuildVisual(sc, ctx));
             rtb.Freeze();
             return rtb;
         }

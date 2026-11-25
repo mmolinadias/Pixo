@@ -65,6 +65,7 @@ namespace Pixo.UI
         private string _petPreviewState = "feliz";
         private int _petFrame;
         private DateTime _petNext = DateTime.MinValue;
+        private DateTime _petStart = DateTime.Now;
 
         public MainWindow(bool welcome = false)
         {
@@ -79,7 +80,7 @@ namespace Pixo.UI
                 new NavItem { Icon = "home", Title = "Início", Page = "PageHome" },
                 new NavItem { Icon = "screens", Title = "Telas", Page = "PageScreens" },
                 new NavItem { Icon = "monitor", Title = "Tela física", Page = "PageDevice" },
-                new NavItem { Icon = "pet", Title = "Bichinho", Page = "PagePet" },
+                new NavItem { Icon = "pet", Title = "Bichinhos", Page = "PagePet" },
                 new NavItem { Icon = "mic", Title = "Voz", Page = "PageVoice" },
                 new NavItem { Icon = "gamepad", Title = "Jogos", Page = "PageGames" },
                 new NavItem { Icon = "download", Title = "Downloads", Page = "PageDownloads" },
@@ -98,7 +99,7 @@ namespace Pixo.UI
 
             // Bichinho
             PetStateBox.Items.Add("Ao vivo (humor de agora)");
-            foreach (var kv in Bit.States) PetStateBox.Items.Add(kv.Value.Name);
+            foreach (var kv in Pets.States) PetStateBox.Items.Add(kv.Value.Name);
             PetStateBox.SelectedIndex = 0;
 
             // Voz
@@ -115,7 +116,7 @@ namespace Pixo.UI
             RefreshPaths();
             WelcomeBar.IsOpen = welcome;
 
-            _timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
+            _timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(40) };
             _timer.Tick += (s, e) => Tick();
             _timer.Start();
 
@@ -177,17 +178,22 @@ namespace Pixo.UI
             // prévia animada do bichinho
             if (PagePet.Visibility == Visibility.Visible)
             {
-                string state = PetStateBox.SelectedIndex <= 0 ? eng.PetState : Bit.States.Keys.ElementAt(PetStateBox.SelectedIndex - 1);
+                string state = PetStateBox.SelectedIndex <= 0 ? eng.PetState : Pets.States.Keys.ElementAt(PetStateBox.SelectedIndex - 1);
                 if (state != _petPreviewState) { _petPreviewState = state; _petFrame = 0; _petNext = DateTime.MinValue; }
+                var info = Pets.States[_petPreviewState];
                 if (DateTime.Now >= _petNext)
                 {
-                    var info = Bit.States[_petPreviewState];
-                    PetPreview.Source = Images.BitFrame(_petPreviewState, _petFrame);
+                    // avança para a próxima pose
+                    if (_petNext != DateTime.MinValue) _petFrame = (_petFrame + 1) % info.Durations.Length;
                     int dur = info.Durations[_petFrame];
-                    _petFrame = (_petFrame + 1) % info.Durations.Length;
-                    if (_petFrame == 0 && !info.Loop) dur += 900;
-                    _petNext = DateTime.Now.AddMilliseconds(dur);
+                    if (_petFrame == info.Durations.Length - 1 && !info.Loop) dur += 900;
+                    _petStart = DateTime.Now;
+                    _petNext = _petStart.AddMilliseconds(dur);
                 }
+                // desenha "entre poses", como no display
+                bool hold = !info.Loop && _petFrame == info.Durations.Length - 1;
+                double t = hold ? 0 : Math.Clamp((DateTime.Now - _petStart).TotalMilliseconds / info.Durations[_petFrame], 0, 0.999);
+                PetPreview.Source = Images.PetsFrame(_petPreviewState, _petFrame + t);
             }
         }
 

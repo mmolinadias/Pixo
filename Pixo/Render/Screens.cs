@@ -514,16 +514,25 @@ namespace Pixo.Render
             _reactionUntil = DateTime.Now.AddSeconds(30);
         }
 
-        public override TimeSpan Interval
-        {
-            get
-            {
-                var d = _nextFrame - DateTime.Now;
-                return d < TimeSpan.FromMilliseconds(20) ? TimeSpan.FromMilliseconds(20) : d;
-            }
-        }
+        // redesenha ~25 vezes por segundo; a dupla é desenhada "entre poses" (interpolada),
+        // então a animação fica fluida. Só o pedaço que mudou vai para a tela.
+        public override TimeSpan Interval => TimeSpan.FromMilliseconds(40);
+
+        private DateTime _frameStart = DateTime.Now;
 
         public override void OnShow() { _nextFrame = DateTime.MinValue; }
+
+        /// <summary>Posição atual na animação, com fração (ex.: 3,4 = 40% entre a pose 3 e a 4).</summary>
+        private double Position()
+        {
+            var info = Pets.States[_state];
+            bool lastOfOneShot = !info.Loop && _frame >= info.Durations.Length - 1;
+            if (_oneShotDone || lastOfOneShot) return _frame;
+            double total = (_nextFrame - _frameStart).TotalMilliseconds;
+            if (total <= 0) return _frame;
+            double t = (DateTime.Now - _frameStart).TotalMilliseconds / total;
+            return _frame + Math.Clamp(t, 0, 0.999);
+        }
 
         /// <summary>Estado de fundo, conforme o que acontece no PC.</summary>
         private string BaseState()
@@ -544,13 +553,14 @@ namespace Pixo.Render
             var now = DateTime.Now;
             if (now < _nextFrame) return;
 
-            var info = Bit.States[_state];
+            var info = Pets.States[_state];
             bool atEnd = _frame >= info.Durations.Length - 1;
 
             // um estado sem loop termina e volta para o de fundo
             if (!info.Loop && atEnd && !_oneShotDone)
             {
                 _oneShotDone = true;
+                _frameStart = now;
                 _nextFrame = now.AddMilliseconds(900);
                 return;
             }
@@ -558,7 +568,7 @@ namespace Pixo.Render
             string target = BaseState();
             if (_reaction != null && now < _reactionUntil) { target = _reaction; _reaction = null; }
             else if (_reaction != null) _reaction = null;
-            else if (target == "feliz" && now > _nextHeart && (_state == "feliz" || !Bit.States[_state].Loop))
+            else if (target == "feliz" && now > _nextHeart && (_state == "feliz" || !Pets.States[_state].Loop))
             {
                 target = "feliz_coracao";
                 _nextHeart = now.AddSeconds(25);
@@ -577,7 +587,8 @@ namespace Pixo.Render
             {
                 _frame = info.Loop ? (_frame + 1) % info.Durations.Length : Math.Min(_frame + 1, info.Durations.Length - 1);
             }
-            _nextFrame = now.AddMilliseconds(Bit.States[_state].Durations[_frame]);
+            _frameStart = now;
+            _nextFrame = now.AddMilliseconds(Pets.States[_state].Durations[_frame]);
         }
 
         public override void Draw(DrawingContext dc, FrameCtx ctx)
@@ -585,25 +596,30 @@ namespace Pixo.Render
             Advance();
             var cfg = _cfg();
             var hw = HardwareService.Current;
-            var info = Bit.States[_state];
+            var info = Pets.States[_state];
+
+            // cabeçalho + chip do humor
             D.Header(dc, Head(ctx, "pet"));
+            D.Chip(dc, info.Chip, 132, 10, 20, Pal.S2, Pal.Accent, 12, 700, 8);
 
-            dc.PushTransform(new TranslateTransform(24, 72));
-            Bit.Draw(dc, _state, _frame);
-            dc.Pop();
+            // a dupla na almofada (360×216, pixel art 6×)
+            D.PetsDuo(dc, _state, Position(), 60, 40);
 
-            D.Text(dc, cfg.PetName, 220, 60, 248, 38, 32, 800, Pal.Ink);
-            D.Chip(dc, info.Chip, 220, 104, 20, Pal.S2, Pal.Accent, 12, 700, 8);
-            D.Text(dc, info.Phrase, 220, 132, 248, 40, 16, 600, Pal.Ink2, Align.Left, 2);
+            // nomes embaixo de cada um
+            D.Text(dc, cfg.PetName1, 112, 258, 100, 16, 13, 700, Pal.Ink, Align.Center);
+            D.Text(dc, cfg.PetName2, 256, 258, 100, 16, 13, 700, Pal.Ink, Align.Center);
 
+            // frase da dupla
+            string phrase = string.Format(info.Phrase, cfg.PetName1, cfg.PetName2);
+            D.Text(dc, phrase, 12, 278, 228, 32, 13, 600, Pal.Ink2, Align.Left, 2);
+
+            // energia (CPU) e calor, em bloquinhos retrô
             double cpu = hw.CpuLoad ?? 0;
             double temp = hw.Cpu?.Temp ?? 0;
-            D.Text(dc, "Energia", 220, 196, 120, 16, 13, 600, Pal.Ink);
-            D.Text(dc, D.N0(cpu) + "% CPU", 368, 196, 100, 16, 13, 600, Pal.Ink2, Align.Right);
-            D.Bar(dc, 220, 218, 248, 10, cpu, Pal.Accent);
-            D.Text(dc, "Calor", 220, 242, 120, 16, 13, 600, Pal.Ink);
-            D.Text(dc, D.N0(temp) + "°C", 368, 242, 100, 16, 13, 600, Pal.Ink2, Align.Right);
-            D.Bar(dc, 220, 264, 248, 10, temp, Pal.Temp(hw.Cpu?.Temp));
+            D.Text(dc, "Energia", 256, 277, 56, 16, 12, 600, Pal.Ink2);
+            D.SegBar(dc, 316, 280, 152, 10, 10, cpu, Pal.Accent);
+            D.Text(dc, "Calor", 256, 294, 56, 16, 12, 600, Pal.Ink2);
+            D.SegBar(dc, 316, 297, 152, 10, 10, temp, Pal.Temp(hw.Cpu?.Temp));
         }
     }
 
@@ -616,17 +632,18 @@ namespace Pixo.Render
         private readonly Func<Config> _cfg;
         private int _frame;
         public WelcomeScreen(Func<Config> cfg) { _cfg = cfg; }
-        public override TimeSpan Interval => TimeSpan.FromMilliseconds(125);
+        public override TimeSpan Interval => TimeSpan.FromMilliseconds(40);
         public override void OnShow() { _frame = 0; }
 
         public override void Draw(DrawingContext dc, FrameCtx ctx)
         {
-            dc.PushTransform(new TranslateTransform(150, 28));
-            Bit.Draw(dc, "feliz_coracao", Math.Min(_frame, 11));
-            dc.Pop();
+            var cfg = _cfg();
+            // ~25 quadros/s; o coração sobe ao longo dos 12 quadros do estado
+            double pos = Math.Min(_frame * 0.32, 11);
+            D.PetsDuo(dc, "feliz_coracao", pos, 60, 16);
             _frame++;
-            D.Text(dc, "Oi! Eu sou o " + _cfg().PetName + ".", 0, 214, 480, 38, 32, 800, Pal.Ink, Align.Center);
-            D.Text(dc, "Tudo conectado. Vamos nessa!", 0, 258, 480, 20, 16, 600, Pal.Ink2, Align.Center);
+            D.Text(dc, "Oi! Somos o " + cfg.PetName1 + " e o " + cfg.PetName2 + ".", 0, 238, 480, 28, 24, 700, Pal.Ink, Align.Center);
+            D.Text(dc, "Tudo conectado. Vamos nessa!", 0, 272, 480, 20, 15, 600, Pal.Ink2, Align.Center);
         }
     }
 }

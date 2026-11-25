@@ -267,34 +267,40 @@
                                         Message="A tela não pode ser usada por dois programas ao mesmo tempo. Feche o UsbMonitor e tire ele da inicialização do Windows." />
                         </StackPanel>
 
-                        <!-- ===== Bichinho ===== -->
+                        <!-- ===== Bichinhos ===== -->
                         <StackPanel x:Name="PagePet" Visibility="Collapsed">
-                            <TextBlock Text="Bichinho" Style="{StaticResource PageTitle}" />
-                            <TextBlock Text="O Bit reage ao seu PC: fica feliz, ocupado, com calor, dorme, joga, dança e comemora." Style="{StaticResource PageSubtitle}" />
-                            <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
-                                <Border CornerRadius="12" Background="{StaticResource PixoDisplayBg}" BorderBrush="{StaticResource PixoStroke}" BorderThickness="1">
-                                    <Image x:Name="PetPreview" Width="180" Height="180" />
-                                </Border>
-                                <StackPanel Margin="20,0,0,0" VerticalAlignment="Center">
-                                    <TextBlock Text="Prévia" Style="{StaticResource RowTitle}" />
-                                    <TextBlock x:Name="PetPreviewHint" Text="Mostrando o humor de agora" Style="{StaticResource RowHint}" Margin="0,2,0,8" />
-                                    <ComboBox x:Name="PetStateBox" Width="240" SelectionChanged="OnPetStateChanged" />
-                                </StackPanel>
+                            <TextBlock Text="Bichinhos" Style="{StaticResource PageTitle}" />
+                            <TextBlock Text="O Fred e o Dengo reagem ao seu PC: ficam de boa, ocupados, com calor, dormem, jogam, dançam e comemoram." Style="{StaticResource PageSubtitle}" />
+                            <Border HorizontalAlignment="Left" CornerRadius="12" Background="{StaticResource PixoDisplayBg}" BorderBrush="{StaticResource PixoStroke}" BorderThickness="1" Padding="12">
+                                <Image x:Name="PetPreview" Width="360" Height="216" RenderOptions.BitmapScalingMode="NearestNeighbor" />
+                            </Border>
+                            <StackPanel Orientation="Horizontal" Margin="0,8,0,12">
+                                <TextBlock x:Name="PetPreviewHint" Text="Mostrando o humor de agora" Style="{StaticResource RowHint}" VerticalAlignment="Center" Margin="0,0,12,0" />
+                                <ComboBox x:Name="PetStateBox" Width="260" SelectionChanged="OnPetStateChanged" />
                             </StackPanel>
                             <ui:CardControl Style="{StaticResource Row}">
                                 <ui:CardControl.Header>
                                     <StackPanel>
-                                        <TextBlock Text="Nome" Style="{StaticResource RowTitle}" />
-                                        <TextBlock Text="Como o bichinho se chama" Style="{StaticResource RowHint}" />
+                                        <TextBlock Text="Nome do cachorro" Style="{StaticResource RowTitle}" />
+                                        <TextBlock Text="Aparece embaixo dele e nas frases" Style="{StaticResource RowHint}" />
                                     </StackPanel>
                                 </ui:CardControl.Header>
-                                <TextBox Width="200" Text="{Binding PetName, UpdateSourceTrigger=PropertyChanged}" MaxLength="14" />
+                                <TextBox Width="200" Text="{Binding PetName1, UpdateSourceTrigger=PropertyChanged}" MaxLength="12" />
+                            </ui:CardControl>
+                            <ui:CardControl Style="{StaticResource Row}">
+                                <ui:CardControl.Header>
+                                    <StackPanel>
+                                        <TextBlock Text="Nome do gato" Style="{StaticResource RowTitle}" />
+                                        <TextBlock Text="Aparece embaixo dele e nas frases" Style="{StaticResource RowHint}" />
+                                    </StackPanel>
+                                </ui:CardControl.Header>
+                                <TextBox Width="200" Text="{Binding PetName2, UpdateSourceTrigger=PropertyChanged}" MaxLength="12" />
                             </ui:CardControl>
                             <ui:CardControl Style="{StaticResource Row}">
                                 <ui:CardControl.Header>
                                     <StackPanel>
                                         <TextBlock Text="Hora de dormir" Style="{StaticResource RowTitle}" />
-                                        <TextBlock Text="Ele dorme depois deste tempo sem você mexer no PC" Style="{StaticResource RowHint}" />
+                                        <TextBlock Text="Eles dormem depois deste tempo sem você mexer no PC" Style="{StaticResource RowHint}" />
                                     </StackPanel>
                                 </ui:CardControl.Header>
                                 <StackPanel Orientation="Horizontal">
@@ -480,7 +486,7 @@
                                         <Image x:Name="AboutLogo" Width="40" Height="40" Margin="0,0,14,0" />
                                         <StackPanel VerticalAlignment="Center">
                                             <TextBlock Text="Pixo 1.0" Style="{StaticResource RowTitle}" />
-                                            <TextBlock Text="Para a Turing Smart Screen 3,5&quot;. Feito com carinho pelo Bit." Style="{StaticResource RowHint}" />
+                                            <TextBlock Text="Para a Turing Smart Screen 3,5&quot;. Feito com carinho pelo Fred e pelo Dengo." Style="{StaticResource RowHint}" />
                                         </StackPanel>
                                     </StackPanel>
                                 </ui:CardControl.Header>
