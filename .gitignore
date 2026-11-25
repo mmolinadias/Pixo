@@ -19,3 +19,6 @@ vosk-model-*/
 Thumbs.db
 Desktop.ini
 .DS_Store
+
+# Arquivos gerados pelo Claude (referências, imagens, zips)
+Claude outputs/
