@@ -18,7 +18,7 @@
     <RootNamespace>Pixo</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Assets\pixo.ico</ApplicationIcon>
-    <Version>1.1.0</Version>
+    <Version>1.2.0</Version>
     <!-- entrada própria (Program.cs): o Velopack precisa rodar antes do WPF -->
     <StartupObject>Pixo.Program</StartupObject>
     <Product>Pixo</Product>

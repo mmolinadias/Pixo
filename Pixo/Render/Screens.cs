@@ -619,6 +619,86 @@ namespace Pixo.Render
     }
 
     // =====================================================================
+    // g3) CLAUDE CODE (painel ao vivo, pelos hooks)
+    // =====================================================================
+    public class ClaudeScreen : Screen
+    {
+        public override string Id => "claude";
+        public override bool HasContent => ClaudeService.HasActive;
+        public override TimeSpan Interval => TimeSpan.FromSeconds(1);
+
+        private static string Ago(DateTime t)
+        {
+            var d = DateTime.Now - t;
+            return d.TotalSeconds < 60 ? $"há {Math.Max(0, (int)d.TotalSeconds)} s"
+                 : d.TotalMinutes < 60 ? $"há {(int)d.TotalMinutes} min"
+                 : $"há {(int)d.TotalHours} h";
+        }
+
+        public override void Draw(DrawingContext dc, FrameCtx ctx)
+        {
+            var (s, others) = ClaudeService.Snapshot();
+            var head = Head(ctx, "claude");
+            head.IconColor = Pal.Orange;
+            D.Header(dc, head);
+            if (s == null)
+            {
+                D.Empty(dc, "claude", Pal.Ink3, "Nenhuma sessão do Claude Code",
+                    "Ligue o Claude Code na aba Geral do Pixo e comece uma conversa.", 78);
+                return;
+            }
+
+            var (chip, col) = s.Status switch
+            {
+                ClaudeStatus.Working => ("TRABALHANDO", Pal.Accent),
+                ClaudeStatus.Waiting => ("TE CHAMANDO", Pal.Warn),
+                ClaudeStatus.Done => ("PRONTO", Pal.Ok),
+                _ => ("PARADO", Pal.Ink3),
+            };
+            double cw = D.Chip(dc, chip, 150, 10, 20, Pal.S2, col, 12, 700, 8);
+            if (others > 0) D.Chip(dc, "+" + others, 150 + cw + 6, 10, 20, Pal.S2, Pal.Ink2, 12, 700, 8);
+
+            // ---- projeto, tempo e o pedido ----
+            D.Card(dc, 12, 48, 456, 84);
+            D.Icon(dc, "folder", 24, 58, 16, Pal.Ink3, 2);
+            D.Text(dc, s.Project ?? "—", 46, 57, 280, 18, 13, 700, Pal.Ink2);
+            D.Icon(dc, "clock", 368, 58, 16, Pal.Ink3, 2);
+            D.Text(dc, D.Clock(s.Elapsed), 388, 55, 68, 22, 17, 700, s.Status == ClaudeStatus.Working ? Pal.Ink : Pal.Ink2, Align.Right);
+            D.Text(dc, string.IsNullOrEmpty(s.Prompt) ? "(sem pedido ainda)" : "“" + s.Prompt + "”", 24, 82, 432, 44, 15, 600, Pal.Ink, Align.Left, 2);
+
+            // ---- agora ----
+            bool waiting = s.Status == ClaudeStatus.Waiting;
+            D.Card(dc, 12, 140, 456, 84, Pal.S1, waiting ? new Pen(Pal.Warn, 2) : null);
+            var act = s.Current ?? new ClaudeAction { Icon = "claude", Text = "—", At = s.LastEvent };
+            string icon = waiting ? "bell" : act.Icon;
+            Brush ic = waiting ? Pal.Warn : s.Status == ClaudeStatus.Done ? Pal.Ok : s.Status == ClaudeStatus.Working ? Pal.Accent : Pal.Ink3;
+            D.Icon(dc, icon, 26, 160, 30, ic, 2.2);
+            D.Text(dc, waiting ? s.WaitingFor : act.Text, 70, 152, 386, 30, 20, 700, Pal.Ink);
+            string sub = waiting ? "O Claude precisa de você"
+                : s.Status == ClaudeStatus.Done ? "Terminou em " + D.Clock(s.Elapsed) + " · " + Ago(s.TurnEnd)
+                : s.Status == ClaudeStatus.Working ? Ago(act.At)
+                : "Sem novidade " + Ago(s.LastEvent);
+            D.Text(dc, sub, 70, 186, 386, 18, 13, 600, waiting ? Pal.Warn : Pal.Ink2);
+
+            // ---- números do pedido ----
+            D.Icon(dc, "sliders", 16, 236, 16, Pal.Ink3, 2);
+            D.Text(dc, s.Tools == 1 ? "1 ação" : s.Tools + " ações", 38, 234, 120, 20, 14, 700, Pal.Ink);
+            D.Icon(dc, "edit", 160, 236, 16, Pal.Ink3, 2);
+            D.Text(dc, s.Files.Count == 1 ? "1 arquivo mexido" : s.Files.Count + " arquivos mexidos", 182, 234, 170, 20, 14, 700, Pal.Ink);
+
+            // ---- o que fez antes ----
+            var before = s.Recent.Where(a => !ReferenceEquals(a, s.Current)).Reverse().Take(2).ToList();
+            for (int i = 0; i < before.Count; i++)
+            {
+                double y = 266 + i * 22;
+                D.Icon(dc, before[i].Icon, 16, y + 2, 14, Pal.Ink3, 2);
+                D.Text(dc, before[i].Text, 38, y, 340, 18, 13, 600, Pal.Ink3);
+                D.Text(dc, Ago(before[i].At), 380, y, 88, 18, 12, 600, Pal.Ink3, Align.Right);
+            }
+        }
+    }
+
+    // =====================================================================
     // h) BICHINHO
     // =====================================================================
     public class PetScreen : Screen
@@ -693,6 +773,7 @@ namespace Pixo.Render
             if (GameService.Current != null) return "jogando";
             if (temp > 80) return "quente";
             if (MediaService.Current?.Playing == true) return "musica";
+            if (ClaudeService.AnyWorking) return "ocupado"; // ajudando o Claude Code
             if (GameService.IdleSeconds() > cfg.PetSleepMinutes * 60) return "dormindo";
             if (IsNight(DateTime.Now)) return "dormindo"; // depois das 23h a dupla vai dormir
             if ((hw.CpuLoad ?? 0) > 60) return "ocupado";
@@ -778,6 +859,8 @@ namespace Pixo.Render
                 : needy ? string.Format("{0} e {1} tão com saudade de um carinho…", cfg.PetName1, cfg.PetName2)
                 : _state == "dormindo" && IsNight(DateTime.Now) && GameService.IdleSeconds() < cfg.PetSleepMinutes * 60
                     ? "Já passou das 23h… a dupla foi dormir. E você?"
+                : _state == "ocupado" && ClaudeService.AnyWorking
+                    ? string.Format("{0} e {1} tão ajudando o Claude a programar!", cfg.PetName1, cfg.PetName2)
                 : string.Format(info.Phrase, cfg.PetName1, cfg.PetName2);
             D.Text(dc, phrase, 12, 278, 228, 32, 13, 600, saying ? Pal.Ink : Pal.Ink2, Align.Left, 2);
 

@@ -342,8 +342,8 @@ namespace Pixo.UI
             ClaudeButton.Content = on ? "Desligar" : "Ligar";
             if (DateTime.Now >= _claudeMsgUntil)
                 ClaudeStatusText.Text = on
-                    ? "Ligado: o Fred e o Dengo avisam quando o Claude Code te chama ou termina"
-                    : "Quando o Claude Code precisa de você ou termina, o Fred e o Dengo avisam na tela";
+                    ? "Ligado: painel ao vivo na tela e avisos da dupla (vale para as sessões novas do Claude Code)"
+                    : "Painel ao vivo do Claude Code na tela, e o Fred e o Dengo avisam quando ele te chama ou termina";
         }
 
         // ---------------- Atualizações ----------------

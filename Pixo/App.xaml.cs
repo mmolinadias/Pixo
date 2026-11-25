@@ -60,6 +60,9 @@ namespace Pixo
             PixoApi.Start(() => Cfg, action => Engine.Post(action));
             Updater.Start();
 
+            // painel do Claude Code: quem tinha ligado a versão antiga (só "te chamou"/"terminou") ganha a completa
+            try { if (ClaudeHooks.HasOldVersion() && !ClaudeHooks.IsInstalled(Cfg.ApiPort)) ClaudeHooks.Install(Cfg.ApiPort); } catch { }
+
             // "Iniciar com o Windows": corrige o caminho (ex.: veio do C:\Pixo para o instalado) e, na primeira
             // vez num PC instalado pelo Setup, já deixa ligado (dá para desligar na aba Geral)
             if (Program.IsAdmin())

@@ -268,7 +268,7 @@ namespace Pixo.Core
     public static class ScreenInfo
     {
         public static readonly string[] RotationIds =
-            { "temperaturas", "musica", "notificacoes", "downloads", "bichinho", "clima", "imagem", "relogio" };
+            { "temperaturas", "musica", "notificacoes", "downloads", "bichinho", "clima", "claude", "imagem", "relogio" };
 
         public static string Name(string id) => id switch
         {
@@ -278,6 +278,7 @@ namespace Pixo.Core
             "downloads" => "Downloads",
             "bichinho" => "Bichinhos",
             "clima" => "Clima",
+            "claude" => "Claude Code",
             "imagem" => "Imagem",
             "relogio" => "Relógio",
             "gamer" => "Modo Gamer",
@@ -292,6 +293,7 @@ namespace Pixo.Core
             "downloads" => "Só aparece quando tem download",
             "bichinho" => "Fred e Dengo, que reagem ao seu PC",
             "clima" => "Tempo lá fora e, com o ar LG, no quarto",
+            "claude" => "O que o Claude Code está fazendo (só aparece com uma sessão aberta)",
             "imagem" => "Suas fotos, uma por vez",
             "relogio" => "Hora e data em letras grandes",
             _ => ""
@@ -305,6 +307,7 @@ namespace Pixo.Core
             "downloads" => "download",
             "bichinho" => "pet",
             "clima" => "cloudSun",
+            "claude" => "claude",
             "imagem" => "image",
             "relogio" => "clock",
             "gamer" => "gamepad",
@@ -320,6 +323,7 @@ namespace Pixo.Core
             ("downloads", "Mostrar Downloads"),
             ("bichinho", "Mostrar Bichinhos"),
             ("clima", "Mostrar Clima"),
+            ("claude", "Mostrar Claude Code"),
             ("carinho", "Fazer carinho nos bichinhos"),
             ("imagem", "Mostrar Imagem"),
             ("relogio", "Mostrar Relógio"),

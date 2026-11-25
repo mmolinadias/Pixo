@@ -614,7 +614,7 @@
                                 <ui:CardControl.Header>
                                     <StackPanel>
                                         <TextBlock Text="Claude Code" Style="{StaticResource RowTitle}" />
-                                        <TextBlock x:Name="ClaudeStatusText" Text="Quando o Claude Code precisa de você ou termina, o Fred e o Dengo avisam na tela" Style="{StaticResource RowHint}" TextWrapping="Wrap" MaxWidth="340" />
+                                        <TextBlock x:Name="ClaudeStatusText" Text="Painel ao vivo do Claude Code na tela, e o Fred e o Dengo avisam quando ele te chama ou termina" Style="{StaticResource RowHint}" TextWrapping="Wrap" MaxWidth="340" />
                                     </StackPanel>
                                 </ui:CardControl.Header>
                                 <StackPanel Orientation="Horizontal">

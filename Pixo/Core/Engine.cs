@@ -76,6 +76,7 @@ namespace Pixo.Core
             var pet = new PetScreen(() => _cfg);
             _screens["bichinho"] = pet;
             _screens["clima"] = new WeatherScreen(() => _cfg);
+            _screens["claude"] = new ClaudeScreen();
             _screens["imagem"] = new ImageScreen(() => _cfg);
             _screens["relogio"] = new ClockScreen();
             _screens["gamer"] = new GamerScreen();
@@ -287,6 +288,12 @@ namespace Pixo.Core
 
                 if (a.StartsWith("midia:")) { MediaService.Command(a.Substring(6)); continue; }
                 if (a.StartsWith("evento:")) { HandleEvent(a.Substring(7)); continue; }
+                if (a == "claude:atualizou")
+                {
+                    // um evento do Claude Code chegou: redesenha já se o painel estiver na tela
+                    if (_current?.Id == "claude") _nextRender = DateTime.MinValue;
+                    continue;
+                }
                 if (a.StartsWith("msg:"))
                 {
                     Pet?.Say("RECADO", a.Substring(4), 30);
@@ -355,9 +362,14 @@ namespace Pixo.Core
             switch (name)
             {
                 case "claude-espera":
+                    // o painel do Claude mostra o que ele está pedindo; a dupla leva um susto junto
                     pet.React("susto");
                     pet.Say("CLAUDE", "O Claude tá te chamando! Dá uma olhada lá.", 45);
-                    ShowPetsForAWhile(45);
+                    if (!_inGame)
+                    {
+                        Show(ClaudeService.HasActive ? "claude" : "bichinho", true);
+                        _pausedUntil = DateTime.Now.AddSeconds(45);
+                    }
                     break;
                 case "claude-pronto":
                     pet.React("comemora");

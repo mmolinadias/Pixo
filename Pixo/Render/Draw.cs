@@ -292,6 +292,12 @@ namespace Pixo.Render
             ["sunset"] = "M12 9V3 M9 6l3 3 3-3 M5.5 16a6.5 6.5 0 0 1 13 0 M3 16h18 M7 20h10",
             ["leaf"] = "M5 19c0-8 5-14 15-14c0 10-6 15-14 15Z M5 19l8-8",
             ["ac"] = "M3 5h18v8H3Z M6 10h12 M8 16.5v2.5 M12 16.5v3.5 M16 16.5v2.5",
+            // Claude Code
+            ["claude"] = "M12 3v18 M4.2 7.5l15.6 9 M4.2 16.5l15.6-9",
+            ["edit"] = "M4 20h4L19 9l-4-4L4 16Z M13.5 6.5l4 4",
+            ["doc"] = "M6 3h8l4 4v14H6Z M14 3v4h4 M9 12h6 M9 16h6",
+            ["terminal"] = "M3 5h18v14H3Z M7 9l3 3-3 3 M12 15h5",
+            ["search"] = "M10.5 4a6.5 6.5 0 1 1 0 13a6.5 6.5 0 1 1 0-13Z M15.5 15.5L20 20",
         };
 
         private static readonly Dictionary<string, Geometry> GeoCache = new Dictionary<string, Geometry>();

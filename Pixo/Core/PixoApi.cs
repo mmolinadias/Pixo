@@ -18,6 +18,7 @@ namespace Pixo.Core
     ///   curl -X POST http://127.0.0.1:7480/mensagem -d "Pizza chegou!"
     ///   curl http://127.0.0.1:7480/tela/clima                        → mostra uma tela
     ///   curl http://127.0.0.1:7480/status
+    ///   (hooks do Claude Code)  curl -X POST http://127.0.0.1:7480/claude --data-binary @-   → painel do Claude Code
     /// Só aceita conexões do próprio PC, e recusa pedidos feitos por páginas da web (cabeçalho Origin).
     /// </summary>
     public static class PixoApi
@@ -133,6 +134,18 @@ namespace Pixo.Core
                     _post("msg:" + text);
                     return (200, Obj(true));
 
+                case "claude":
+                {
+                    // eventos dos hooks do Claude Code (o JSON que o Claude Code manda no stdin, repassado pelo curl)
+                    JsonNode evt;
+                    try { evt = JsonNode.Parse(body ?? ""); }
+                    catch { return (400, Obj(false, "Mande o JSON do hook no corpo do pedido.")); }
+                    var action = Data.ClaudeService.Handle(evt);
+                    if (action != null) _post(action);
+                    _post("claude:atualizou");
+                    return (200, Obj(true));
+                }
+
                 case "tela" when parts.Length == 2:
                     _post(parts[1]);
                     return (200, Obj(true));
@@ -198,7 +211,7 @@ namespace Pixo.Core
                 if (c > 0) headers[line.Substring(0, c).Trim()] = line.Substring(c + 1).Trim();
             }
 
-            int want = headers.TryGetValue("content-length", out var cl) && int.TryParse(cl, out var v) ? Math.Clamp(v, 0, 4096) : 0;
+            int want = headers.TryGetValue("content-length", out var cl) && int.TryParse(cl, out var v) ? Math.Clamp(v, 0, 4 << 20) : 0; // até 4 MB (um Write grande manda o arquivo inteiro)
             var body = new MemoryStream();
             body.Write(buf, end + 4, Math.Min(len - end - 4, want));
             while (body.Length < want)
