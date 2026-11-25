@@ -279,7 +279,7 @@
                         <!-- ===== Bichinhos ===== -->
                         <StackPanel x:Name="PagePet" Visibility="Collapsed">
                             <TextBlock Text="Bichinhos" Style="{StaticResource PageTitle}" />
-                            <TextBlock Text="O Fred e o Dengo reagem ao seu PC: ficam de boa, ocupados, com calor, dormem, jogam, dançam e comemoram." Style="{StaticResource PageSubtitle}" />
+                            <TextBlock Text="O Fred e o Dengo reagem ao seu PC: ficam de boa, ocupados, com calor, dormem, jogam, dançam, levam susto com picos e comemoram o fim do jogo." Style="{StaticResource PageSubtitle}" />
                             <Border HorizontalAlignment="Left" CornerRadius="12" Background="{StaticResource PixoDisplayBg}" BorderBrush="{StaticResource PixoStroke}" BorderThickness="1" Padding="12">
                                 <Image x:Name="PetPreview" Width="360" Height="216" RenderOptions.BitmapScalingMode="NearestNeighbor" />
                             </Border>
@@ -316,6 +316,92 @@
                                     <Slider Width="200" Minimum="1" Maximum="60" Value="{Binding PetSleepMinutes}" IsSnapToTickEnabled="True" TickFrequency="1" IsMoveToPointEnabled="True" VerticalAlignment="Center" />
                                     <TextBlock Width="60" TextAlignment="Right" Text="{Binding PetSleepMinutes, StringFormat={}{0:0} min}" VerticalAlignment="Center" />
                                 </StackPanel>
+                            </ui:CardControl>
+                            <TextBlock Text="Vida da dupla" Style="{StaticResource SectionTitle}" />
+                            <ui:CardControl Style="{StaticResource Row}">
+                                <ui:CardControl.Header>
+                                    <StackPanel>
+                                        <TextBlock Text="Humor" Style="{StaticResource RowTitle}" />
+                                        <TextBlock Text="Sobe com carinho (diga &quot;carinho&quot;, use a bandeja ou o botão) e cai devagar quando eles ficam sem atenção" Style="{StaticResource RowHint}" TextWrapping="Wrap" MaxWidth="420" />
+                                    </StackPanel>
+                                </ui:CardControl.Header>
+                                <StackPanel Orientation="Horizontal">
+                                    <ProgressBar Width="120" Height="6" Minimum="0" Maximum="100" Value="{Binding PetMood, Mode=OneWay}" VerticalAlignment="Center" Margin="0,0,12,0" />
+                                    <ui:Button Content="Fazer carinho" Click="OnPetCarinho" />
+                                </StackPanel>
+                            </ui:CardControl>
+                            <ui:CardControl Style="{StaticResource Row}">
+                                <ui:CardControl.Header>
+                                    <StackPanel>
+                                        <TextBlock Text="Lembrete de pausa" Style="{StaticResource RowTitle}" />
+                                        <TextBlock Text="Depois desse tempo seguido no PC, eles lembram você de descansar (0 = nunca)" Style="{StaticResource RowHint}" TextWrapping="Wrap" MaxWidth="420" />
+                                    </StackPanel>
+                                </ui:CardControl.Header>
+                                <StackPanel Orientation="Horizontal">
+                                    <Slider Width="200" Minimum="0" Maximum="240" Value="{Binding PetBreakMinutes}" IsSnapToTickEnabled="True" TickFrequency="15" IsMoveToPointEnabled="True" VerticalAlignment="Center" />
+                                    <TextBlock Width="60" TextAlignment="Right" Text="{Binding PetBreakMinutes, StringFormat={}{0:0} min}" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </ui:CardControl>
+                        </StackPanel>
+
+                        <!-- ===== Clima ===== -->
+                        <StackPanel x:Name="PageWeather" Visibility="Collapsed">
+                            <TextBlock Text="Clima" Style="{StaticResource PageTitle}" />
+                            <TextBlock Text="Previsão do Open-Meteo (grátis, sem cadastro) e, com um ar-condicionado LG, a temperatura do quarto." Style="{StaticResource PageSubtitle}" />
+                            <ui:CardControl Style="{StaticResource Row}">
+                                <ui:CardControl.Header>
+                                    <StackPanel>
+                                        <TextBlock Text="Cidade" Style="{StaticResource RowTitle}" />
+                                        <TextBlock x:Name="WeatherPlaceText" Text="Descobrindo pela internet…" Style="{StaticResource RowHint}" TextWrapping="Wrap" MaxWidth="320" />
+                                    </StackPanel>
+                                </ui:CardControl.Header>
+                                <StackPanel Orientation="Horizontal">
+                                    <ui:TextBox x:Name="CityBox" Width="170" PlaceholderText="Automático" Margin="0,0,8,0" />
+                                    <ui:Button Content="Usar" Click="OnCityApply" Margin="0,0,8,0" />
+                                    <ui:Button Content="Automático" Click="OnCityAuto" />
+                                </StackPanel>
+                            </ui:CardControl>
+                            <TextBlock Text="Ar-condicionado LG" Style="{StaticResource SectionTitle}" />
+                            <TextBlock Text="O Pixo só lê a temperatura do quarto (a cada 5 minutos) pela API oficial ThinQ Connect. O token fica criptografado para o seu usuário do Windows." Style="{StaticResource RowHint}" TextWrapping="Wrap" Margin="0,0,0,8" />
+                            <ui:CardControl Style="{StaticResource Row}">
+                                <ui:CardControl.Header>
+                                    <StackPanel>
+                                        <TextBlock Text="Situação" Style="{StaticResource RowTitle}" />
+                                        <TextBlock x:Name="AcStatusText" Text="Nenhum ar conectado" Style="{StaticResource RowHint}" TextWrapping="Wrap" MaxWidth="420" />
+                                    </StackPanel>
+                                </ui:CardControl.Header>
+                                <ui:Button x:Name="AcForgetButton" Content="Desconectar" Click="OnAcForget" />
+                            </ui:CardControl>
+                            <ui:CardControl Style="{StaticResource Row}">
+                                <ui:CardControl.Header>
+                                    <StackPanel>
+                                        <TextBlock Text="Usar o do ControleTV" Style="{StaticResource RowTitle}" />
+                                        <TextBlock Text="Pega o ar que você já configurou no ControleTV, sem colar o token de novo" Style="{StaticResource RowHint}" TextWrapping="Wrap" MaxWidth="420" />
+                                    </StackPanel>
+                                </ui:CardControl.Header>
+                                <ui:Button Content="Importar" Click="OnAcImport" />
+                            </ui:CardControl>
+                            <ui:CardControl Style="{StaticResource Row}">
+                                <ui:CardControl.Header>
+                                    <StackPanel>
+                                        <TextBlock Text="Ou conectar com um token" Style="{StaticResource RowTitle}" />
+                                        <TextBlock Text="Gere um token pessoal no site da LG (ThinQ Connect) e cole aqui" Style="{StaticResource RowHint}" TextWrapping="Wrap" MaxWidth="300" />
+                                    </StackPanel>
+                                </ui:CardControl.Header>
+                                <StackPanel Orientation="Horizontal">
+                                    <ui:Button Content="Site da LG" Click="OnAcSite" Margin="0,0,8,0" />
+                                    <PasswordBox x:Name="AcTokenBox" Width="160" Margin="0,0,8,0" VerticalContentAlignment="Center" />
+                                    <ui:Button Content="Conectar" Click="OnAcConnect" />
+                                </StackPanel>
+                            </ui:CardControl>
+                            <ui:CardControl x:Name="AcPickRow" Style="{StaticResource Row}" Visibility="Collapsed">
+                                <ui:CardControl.Header>
+                                    <StackPanel>
+                                        <TextBlock Text="Qual ar-condicionado?" Style="{StaticResource RowTitle}" />
+                                        <TextBlock Text="A sua conta LG tem mais de um" Style="{StaticResource RowHint}" />
+                                    </StackPanel>
+                                </ui:CardControl.Header>
+                                <ComboBox x:Name="AcPickBox" Width="260" SelectionChanged="OnAcPicked" />
                             </ui:CardControl>
                         </StackPanel>
 
@@ -488,6 +574,42 @@
                                     </StackPanel>
                                 </ui:CardControl.Header>
                                 <ui:Button Content="Abrir" Click="OnOpenConfigFolder" />
+                            </ui:CardControl>
+                            <TextBlock Text="Pixo API" Style="{StaticResource SectionTitle}" />
+                            <TextBlock Text="Programas deste PC podem mandar avisos para a tela. Ex.: curl -X POST http://127.0.0.1:7480/mensagem -d &quot;Pizza chegou!&quot;" Style="{StaticResource RowHint}" TextWrapping="Wrap" Margin="0,0,0,8" />
+                            <ui:CardControl Style="{StaticResource Row}">
+                                <ui:CardControl.Header>
+                                    <StackPanel>
+                                        <TextBlock Text="Ligada" Style="{StaticResource RowTitle}" />
+                                        <TextBlock x:Name="ApiStatusText" Text="—" Style="{StaticResource RowHint}" TextWrapping="Wrap" MaxWidth="420" />
+                                    </StackPanel>
+                                </ui:CardControl.Header>
+                                <ui:ToggleSwitch IsChecked="{Binding ApiEnabled}" Click="OnApiToggled" />
+                            </ui:CardControl>
+                            <ui:CardControl Style="{StaticResource Row}">
+                                <ui:CardControl.Header>
+                                    <StackPanel>
+                                        <TextBlock Text="Porta" Style="{StaticResource RowTitle}" />
+                                        <TextBlock Text="Mude só se outro programa já usa a 7480" Style="{StaticResource RowHint}" />
+                                    </StackPanel>
+                                </ui:CardControl.Header>
+                                <StackPanel Orientation="Horizontal">
+                                    <ui:TextBox x:Name="ApiPortBox" Width="90" Margin="0,0,8,0" />
+                                    <ui:Button Content="Aplicar" Click="OnApiPort" />
+                                </StackPanel>
+                            </ui:CardControl>
+                            <ui:CardControl Style="{StaticResource Row}">
+                                <ui:CardControl.Header>
+                                    <StackPanel>
+                                        <TextBlock Text="Claude Code" Style="{StaticResource RowTitle}" />
+                                        <TextBlock x:Name="ClaudeStatusText" Text="Quando o Claude Code precisa de você ou termina, o Fred e o Dengo avisam na tela" Style="{StaticResource RowHint}" TextWrapping="Wrap" MaxWidth="340" />
+                                    </StackPanel>
+                                </ui:CardControl.Header>
+                                <StackPanel Orientation="Horizontal">
+                                    <ui:Button x:Name="ClaudeButton" Content="Ligar" Click="OnClaudeToggle" Margin="0,0,8,0" />
+                                    <ui:Button Content="Testar" Click="OnClaudeTest" Margin="0,0,8,0" />
+                                    <ui:Button Content="Copiar config." Click="OnClaudeCopy" />
+                                </StackPanel>
                             </ui:CardControl>
                             <ui:CardControl Style="{StaticResource Row}">
                                 <ui:CardControl.Header>

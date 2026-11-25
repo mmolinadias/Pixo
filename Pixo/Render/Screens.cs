@@ -489,6 +489,136 @@ namespace Pixo.Render
     }
 
     // =====================================================================
+    // g2) CLIMA (Open-Meteo) + quarto (ar-condicionado LG)
+    // =====================================================================
+    public class WeatherScreen : Screen
+    {
+        public override string Id => "clima";
+        public override TimeSpan Interval => TimeSpan.FromSeconds(5);
+        private readonly Func<Config> _cfg;
+
+        public WeatherScreen(Func<Config> cfg) { _cfg = cfg; }
+
+        public static Brush IconColor(string icon) => icon switch
+        {
+            "sun" or "cloudSun" => Pal.Warn,
+            "moon" or "cloudMoon" => Pal.Accent,
+            "rain" or "drizzle" => Pal.Blue,
+            "storm" => Pal.Gamer,
+            "snow" => Pal.Ink,
+            "fog" => Pal.Ink3,
+            _ => Pal.Ink2,
+        };
+
+        /// <summary>Cor de conforto de uma temperatura ambiente.</summary>
+        public static Brush Comfort(double? t) => t == null ? Pal.Ink3 : t < 18 ? Pal.Blue : t < 26 ? Pal.Ok : t < 30 ? Pal.Warn : Pal.Hot;
+
+        private static string Deg(double? t) => t == null ? "--" : D.N0(t.Value) + "°";
+
+        private static string DayName(DateTime d)
+        {
+            if (d.Date == DateTime.Today) return "Hoje";
+            if (d.Date == DateTime.Today.AddDays(1)) return "Amanhã";
+            var s = d.ToString("ddd", D.PtBr).TrimEnd('.');
+            return s.Length > 0 ? char.ToUpper(s[0], D.PtBr) + s.Substring(1) : s;
+        }
+
+        public override void Draw(DrawingContext dc, FrameCtx ctx)
+        {
+            var w = WeatherService.Current;
+            var ac = AcService.Configured(_cfg()) ? AcService.Current : null;
+            var head = Head(ctx, "cloudSun");
+            if (!string.IsNullOrEmpty(w?.Place)) head.Title = "Clima · " + w.Place.Split(',')[0];
+            D.Header(dc, head);
+
+            if (w == null)
+            {
+                var err = WeatherService.Error;
+                D.Empty(dc, err == null ? "cloud" : "alert", err == null ? Pal.Ink3 : Pal.Warn,
+                    err == null ? "Buscando o clima…" : "Sem dados do clima",
+                    err ?? "Leva só alguns segundos.", 78);
+                return;
+            }
+
+            // ---- agora, lá fora ----
+            D.Card(dc, 12, 48, 228, 146);
+            string icon = WeatherService.Icon(w.Code, w.IsDay);
+            D.Icon(dc, icon, 22, 60, 60, IconColor(icon), 2.2);
+            D.Num(dc, w.Temp == null ? "--" : D.N0(w.Temp.Value), "°", 92, 58, 140, 64, 60, 700, Pal.Ink, Align.Left, 28);
+            D.Text(dc, WeatherService.Describe(w.Code), 22, 130, 206, 20, 15, 700, Pal.Ink);
+            var bits = new System.Collections.Generic.List<string>();
+            if (w.Feels != null) bits.Add("Sensação " + Deg(w.Feels));
+            if (w.Humidity != null) bits.Add("Umidade " + D.N0(w.Humidity.Value) + "%");
+            D.Text(dc, string.Join(" · ", bits), 22, 154, 206, 16, 12, 600, Pal.Ink2);
+            if (w.Wind != null) D.Text(dc, "Vento " + D.N0(w.Wind.Value) + " km/h", 22, 172, 206, 16, 12, 600, Pal.Ink2);
+
+            // ---- no quarto (ar LG) ou, sem ar, chuva e vento ----
+            D.Card(dc, 252, 48, 216, 146);
+            if (ac != null)
+            {
+                D.Icon(dc, "ac", 264, 60, 18, Pal.Accent, 2);
+                D.Text(dc, "NO QUARTO", 288, 60, 168, 18, 13, 700, Pal.Ink2);
+                var col = Comfort(ac.Room);
+                D.Num(dc, ac.Room == null ? "--" : (ac.Room.Value % 1 == 0 ? D.N0(ac.Room.Value) : D.N1(ac.Room.Value)), "°C",
+                    264, 84, 192, 56, 48, 700, col, Align.Left, 20);
+                string status = ac.On
+                    ? "Ar ligado" + (ac.Target != null ? " · " + Deg(ac.Target) : "") + (string.IsNullOrEmpty(ac.Mode) ? "" : " · " + ac.Mode)
+                    : "Ar desligado";
+                D.Dot(dc, 264, 150, 8, ac.On ? Pal.Ok : Pal.Ink3);
+                D.Text(dc, status, 278, 145, 182, 18, 12, 600, Pal.Ink2);
+                if (ac.Room != null && w.Temp != null)
+                {
+                    // compara os números como aparecem na tela (arredondados)
+                    double diff = Math.Round(ac.Room.Value, MidpointRounding.AwayFromZero) - Math.Round(w.Temp.Value, MidpointRounding.AwayFromZero);
+                    string cmp = diff == 0 ? "Igual a lá fora" : D.N0(Math.Abs(diff)) + "° " + (diff < 0 ? "mais fresco" : "mais quente") + " que lá fora";
+                    D.Text(dc, cmp, 264, 168, 196, 16, 12, 600, Pal.Ink3);
+                }
+            }
+            else
+            {
+                var today = w.Days.Length > 0 ? w.Days[0] : null;
+                D.Text(dc, "HOJE", 264, 60, 192, 18, 13, 700, Pal.Ink2);
+                D.Icon(dc, "drop", 264, 88, 20, Pal.Blue, 2);
+                D.Text(dc, "Chuva", 292, 88, 90, 20, 14, 600, Pal.Ink2);
+                D.Text(dc, today?.RainChance == null ? "--" : D.N0(today.RainChance.Value) + "%", 380, 86, 76, 24, 20, 700, Pal.Ink, Align.Right);
+                D.Icon(dc, "thermo", 264, 120, 20, Pal.Hot, 2);
+                D.Text(dc, "Máx / mín", 292, 120, 90, 20, 14, 600, Pal.Ink2);
+                D.Text(dc, Deg(today?.Max) + " / " + Deg(today?.Min), 372, 118, 84, 24, 18, 700, Pal.Ink, Align.Right);
+                D.Text(dc, "Ligue o ar LG na aba Clima do Pixo para ver o quarto aqui.", 264, 152, 196, 32, 11, 600, Pal.Ink3, Align.Left, 2);
+            }
+
+            // ---- próximos dias ----
+            for (int i = 0; i < 3; i++)
+            {
+                double x = 12 + i * 116, y = 202;
+                D.Card(dc, x, y, 108, 106);
+                var d = i < w.Days.Length ? w.Days[i] : null;
+                if (d == null) continue;
+                D.Text(dc, DayName(d.Date), x, y + 8, 108, 18, 13, 700, i == 0 ? Pal.Accent : Pal.Ink2, Align.Center);
+                string di = WeatherService.Icon(d.Code);
+                D.Icon(dc, di, x + 38, y + 30, 32, IconColor(di), 2);
+                D.Text(dc, Deg(d.Max), x + 6, y + 68, 48, 22, 18, 700, Pal.Ink, Align.Right);
+                D.Text(dc, Deg(d.Min), x + 58, y + 70, 44, 20, 15, 600, Pal.Ink3, Align.Left);
+                if (d.RainChance is double rc && rc >= 20)
+                    D.Text(dc, D.N0(rc) + "% chuva", x, y + 88, 108, 14, 11, 600, Pal.Blue, Align.Center);
+            }
+
+            // ---- UV, qualidade do ar, sol ----
+            double ix = 360, iy = 202;
+            D.Card(dc, ix, iy, 108, 106);
+            double uv = w.UvNow ?? w.UvMax ?? -1;
+            D.Icon(dc, "sun", ix + 10, iy + 10, 14, Pal.Warn, 2);
+            D.Text(dc, uv < 0 ? "UV --" : "UV " + D.N0(uv) + " " + WeatherService.UvLevel(uv), ix + 28, iy + 8, 76, 18, 12, 700, Pal.Ink);
+            D.Icon(dc, "leaf", ix + 10, iy + 34, 14, Pal.Ok, 2);
+            D.Text(dc, w.Aqi == null ? "Ar --" : "Ar " + WeatherService.AqiLevel(w.Aqi.Value), ix + 28, iy + 32, 76, 18, 12, 700, Pal.Ink);
+            D.Icon(dc, "sunrise", ix + 10, iy + 58, 14, Pal.Orange, 2);
+            D.Text(dc, w.Sunrise?.ToString("HH:mm") ?? "--", ix + 28, iy + 56, 76, 18, 12, 700, Pal.Ink);
+            D.Icon(dc, "sunset", ix + 10, iy + 82, 14, Pal.Pink, 2);
+            D.Text(dc, w.Sunset?.ToString("HH:mm") ?? "--", ix + 28, iy + 80, 76, 18, 12, 700, Pal.Ink);
+        }
+    }
+
+    // =====================================================================
     // h) BICHINHO
     // =====================================================================
     public class PetScreen : Screen
@@ -503,16 +633,30 @@ namespace Pixo.Render
         private DateTime _nextHeart = DateTime.Now.AddSeconds(20);
         private bool _oneShotDone;
 
+        // recado temporário (pausa, Claude Code, Pixo API...): troca a frase e, se tiver, o chip
+        private string _sayChip, _sayText;
+        private DateTime _sayUntil;
+
         public PetScreen(Func<Config> cfg) { _cfg = cfg; }
 
         public string State => _state;
 
-        /// <summary>Reação curta (susto/comemora). Vale por 30 s se o bichinho não estiver na tela.</summary>
+        /// <summary>Reação curta (susto, comemora, feliz_coracao). Vale por 30 s se o bichinho não estiver na tela.</summary>
         public void React(string reaction)
         {
             _reaction = reaction;
             _reactionUntil = DateTime.Now.AddSeconds(30);
         }
+
+        /// <summary>Mostra um recado no lugar da frase por alguns segundos (chip null = o do estado).</summary>
+        public void Say(string chip, string text, double seconds = 30)
+        {
+            _sayChip = chip;
+            _sayText = text;
+            _sayUntil = DateTime.Now.AddSeconds(seconds);
+        }
+
+        public static bool IsNight(DateTime t) => t.Hour >= 23 || t.Hour < 6;
 
         // redesenha ~25 vezes por segundo; a dupla é desenhada "entre poses" (interpolada),
         // então a animação fica fluida. Só o pedaço que mudou vai para a tela.
@@ -550,6 +694,7 @@ namespace Pixo.Render
             if (temp > 80) return "quente";
             if (MediaService.Current?.Playing == true) return "musica";
             if (GameService.IdleSeconds() > cfg.PetSleepMinutes * 60) return "dormindo";
+            if (IsNight(DateTime.Now)) return "dormindo"; // depois das 23h a dupla vai dormir
             if ((hw.CpuLoad ?? 0) > 60) return "ocupado";
             return "feliz";
         }
@@ -576,8 +721,10 @@ namespace Pixo.Render
             else if (_reaction != null) _reaction = null;
             else if (target == "feliz" && now > _nextHeart && (_state == "feliz" || !Pets.States[_state].Loop))
             {
-                target = "feliz_coracao";
-                _nextHeart = now.AddSeconds(25);
+                // de bom humor, coraçõezinhos mais vezes; carentes, nenhum
+                double mood = _cfg().PetMood;
+                _nextHeart = now.AddSeconds(mood >= 70 ? 15 : 25);
+                if (mood >= 30) target = "feliz_coracao";
             }
 
             bool reactionPlaying = !info.Loop && !_oneShotDone;
@@ -605,9 +752,17 @@ namespace Pixo.Render
             var hw = HardwareService.Current;
             var info = Pets.States[_state];
 
+            bool saying = _sayText != null && DateTime.Now < _sayUntil;
+            bool needy = _state == "feliz" && cfg.PetMood < 30;
+
             // cabeçalho + chip do humor
             D.Header(dc, Head(ctx, "pet"));
-            D.Chip(dc, info.Chip, 132, 10, 20, Pal.S2, Pal.Accent, 12, 700, 8);
+            string chip = saying && _sayChip != null ? _sayChip : needy ? "CARENTES" : info.Chip;
+            D.Chip(dc, chip, 132, 10, 20, Pal.S2, saying && _sayChip != null ? Pal.Warn : Pal.Accent, 12, 700, 8);
+
+            // humor da dupla: 5 coraçõezinhos no canto
+            int full = (int)Math.Round(cfg.PetMood / 20);
+            for (int i = 0; i < 5; i++) PixelHeart(dc, 392 + i * 16, 48, i < full ? Pal.Pink : Pal.Line);
 
             // a dupla na almofada (360×216, pixel art 6×)
             double mix = _from == null ? 1 : (DateTime.Now - _changedAt).TotalMilliseconds / GlideMs;
@@ -618,9 +773,13 @@ namespace Pixo.Render
             D.Text(dc, cfg.PetName1, 112, 258, 100, 16, 13, 700, Pal.Ink, Align.Center);
             D.Text(dc, cfg.PetName2, 256, 258, 100, 16, 13, 700, Pal.Ink, Align.Center);
 
-            // frase da dupla
-            string phrase = string.Format(info.Phrase, cfg.PetName1, cfg.PetName2);
-            D.Text(dc, phrase, 12, 278, 228, 32, 13, 600, Pal.Ink2, Align.Left, 2);
+            // frase da dupla (ou o recado do momento)
+            string phrase = saying ? _sayText
+                : needy ? string.Format("{0} e {1} tão com saudade de um carinho…", cfg.PetName1, cfg.PetName2)
+                : _state == "dormindo" && IsNight(DateTime.Now) && GameService.IdleSeconds() < cfg.PetSleepMinutes * 60
+                    ? "Já passou das 23h… a dupla foi dormir. E você?"
+                : string.Format(info.Phrase, cfg.PetName1, cfg.PetName2);
+            D.Text(dc, phrase, 12, 278, 228, 32, 13, 600, saying ? Pal.Ink : Pal.Ink2, Align.Left, 2);
 
             // energia (CPU) e calor, em bloquinhos retrô
             double cpu = hw.CpuLoad ?? 0;
@@ -629,6 +788,16 @@ namespace Pixo.Render
             D.SegBar(dc, 316, 280, 152, 10, 10, cpu, Pal.Accent);
             D.Text(dc, "Calor", 256, 294, 56, 16, 12, 600, Pal.Ink2);
             D.SegBar(dc, 316, 297, 152, 10, 10, temp, Pal.Temp(hw.Cpu?.Temp));
+        }
+
+        // coração em pixel art (7×6 pixels de 2 px)
+        private static readonly string[] HeartMap = { ".xx.xx.", "xxxxxxx", "xxxxxxx", ".xxxxx.", "..xxx..", "...x..." };
+
+        private static void PixelHeart(DrawingContext dc, double x, double y, Brush color)
+        {
+            for (int j = 0; j < HeartMap.Length; j++)
+                for (int i = 0; i < HeartMap[j].Length; i++)
+                    if (HeartMap[j][i] == 'x') dc.DrawRectangle(color, null, new Rect(x + i * 2, y + j * 2, 2, 2));
         }
     }
 

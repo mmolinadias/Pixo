@@ -65,6 +65,13 @@
             <Border Height="1" Background="{StaticResource PixoStroke}" Margin="0,0,0,4" />
 
             <ui:Button Appearance="Transparent" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                       Padding="12,8" Margin="0,2" Click="OnCarinho">
+                <StackPanel Orientation="Horizontal">
+                    <local:PixoIcon Kind="heart" Width="16" Height="16" Margin="0,0,10,0" />
+                    <TextBlock Text="Fazer carinho nos bichinhos" />
+                </StackPanel>
+            </ui:Button>
+            <ui:Button Appearance="Transparent" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
                        Padding="12,8" Margin="0,2" Click="OnSettings">
                 <StackPanel Orientation="Horizontal">
                     <local:PixoIcon Kind="sliders" Width="16" Height="16" Margin="0,0,10,0" />

@@ -12,6 +12,7 @@ using System.Windows.Controls;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using Pixo.Core;
+using Pixo.Data;
 using Pixo.Render;
 
 namespace Pixo.UI
@@ -81,6 +82,7 @@ namespace Pixo.UI
                 new NavItem { Icon = "screens", Title = "Telas", Page = "PageScreens" },
                 new NavItem { Icon = "monitor", Title = "Tela física", Page = "PageDevice" },
                 new NavItem { Icon = "pet", Title = "Bichinhos", Page = "PagePet" },
+                new NavItem { Icon = "cloudSun", Title = "Clima", Page = "PageWeather" },
                 new NavItem { Icon = "mic", Title = "Voz", Page = "PageVoice" },
                 new NavItem { Icon = "gamepad", Title = "Jogos", Page = "PageGames" },
                 new NavItem { Icon = "download", Title = "Downloads", Page = "PageDownloads" },
@@ -110,8 +112,12 @@ namespace Pixo.UI
             App.Voice.Changed += () => Dispatcher.BeginInvoke(new Action(RefreshVoice));
             RefreshVoice();
 
+            // Clima
+            CityBox.Text = _cfg.WeatherCity;
+
             // Geral
             StartupSwitch.IsChecked = Startup.IsEnabled();
+            ApiPortBox.Text = _cfg.ApiPort.ToString();
 
             RefreshPaths();
             WelcomeBar.IsOpen = welcome;
@@ -197,6 +203,191 @@ namespace Pixo.UI
                 double t = hold ? 0 : Math.Clamp((DateTime.Now - _petStart).TotalMilliseconds / info.Durations[_petFrame], 0, 0.999);
                 PetPreview.Source = Images.PetsFrame(_petPreviewState, _petFrame + t);
             }
+
+            // textos de situação (clima, ar, API): 1 vez por segundo basta
+            if ((DateTime.Now - _slowTick).TotalSeconds >= 1)
+            {
+                _slowTick = DateTime.Now;
+                if (PageWeather.Visibility == Visibility.Visible) RefreshWeatherPage();
+                if (PageGeneral.Visibility == Visibility.Visible) RefreshApiPage();
+            }
+        }
+
+        private DateTime _slowTick = DateTime.MinValue;
+        private DateTime _acMsgUntil = DateTime.MinValue, _claudeMsgUntil = DateTime.MinValue;
+
+        // ---------------- Bichinhos: carinho ----------------
+
+        private void OnPetCarinho(object sender, RoutedEventArgs e) => App.Engine.Post("carinho");
+
+        // ---------------- Clima ----------------
+
+        private void RefreshWeatherPage()
+        {
+            var w = WeatherService.Current;
+            string how = string.IsNullOrEmpty(_cfg.WeatherCity) ? "Automático: " : "";
+            WeatherPlaceText.Text = WeatherService.Error != null && (w == null || !string.IsNullOrEmpty(_cfg.WeatherCity) && w.Place?.StartsWith(_cfg.WeatherCity, StringComparison.OrdinalIgnoreCase) != true)
+                ? WeatherService.Error
+                : w == null ? "Buscando o clima…"
+                : how + w.Place + " · atualizado às " + w.Updated.ToString("HH:mm");
+
+            AcForgetButton.IsEnabled = AcService.Configured(_cfg);
+            if (DateTime.Now < _acMsgUntil) return;
+            var ac = AcService.Current;
+            AcStatusText.Text = !AcService.Configured(_cfg) ? "Nenhum ar conectado"
+                : AcService.Error != null ? (_cfg.AcName + ": " + AcService.Error)
+                : ac == null ? "Lendo o ar…"
+                : $"{ac.Name}: quarto a {(ac.Room == null ? "--" : D.N1(ac.Room.Value))}°C · {(ac.On ? "ligado" : "desligado")} · lido às {ac.Updated:HH:mm}";
+        }
+
+        private void AcMessage(string text)
+        {
+            AcStatusText.Text = text;
+            _acMsgUntil = DateTime.Now.AddSeconds(6);
+        }
+
+        private void OnCityApply(object sender, RoutedEventArgs e)
+        {
+            _cfg.WeatherCity = CityBox.Text;
+            WeatherPlaceText.Text = "Procurando…";
+            WeatherService.RefreshSoon();
+        }
+
+        private void OnCityAuto(object sender, RoutedEventArgs e)
+        {
+            CityBox.Text = "";
+            _cfg.WeatherCity = "";
+            WeatherPlaceText.Text = "Descobrindo pela internet…";
+            WeatherService.RefreshSoon();
+        }
+
+        private void OnAcImport(object sender, RoutedEventArgs e)
+        {
+            var path = AcService.FindControleTv();
+            if (path == null)
+            {
+                var dlg = new Microsoft.Win32.OpenFileDialog
+                {
+                    Title = "Escolha o arquivo ar.json do ControleTV (pasta dados)",
+                    Filter = "ar.json|ar.json|Arquivos JSON|*.json",
+                };
+                if (dlg.ShowDialog(this) != true) return;
+                path = dlg.FileName;
+            }
+            try
+            {
+                var err = AcService.ImportControleTv(_cfg, path);
+                AcMessage(err ?? "Pronto! Usando o ar do ControleTV. Lendo a temperatura…");
+            }
+            catch (Exception ex) { AcMessage("Não deu para ler o arquivo: " + ex.Message); }
+        }
+
+        private string _pendingToken;
+        private List<(string Id, string Name, string Model)> _acChoices;
+
+        private async void OnAcConnect(object sender, RoutedEventArgs e)
+        {
+            var token = AcTokenBox.Password.Trim();
+            if (token.Length == 0) { AcMessage("Cole o token da LG no campo primeiro."); return; }
+            AcMessage("Falando com a LG…");
+            try
+            {
+                var list = await AcService.ListAcs(_cfg, token);
+                if (list.Count == 0) { AcMessage("Nenhum ar-condicionado nessa conta LG."); return; }
+                if (list.Count == 1)
+                {
+                    AcService.Save(_cfg, token, list[0].Id, list[0].Name);
+                    AcTokenBox.Clear();
+                    AcMessage($"Conectado: {list[0].Name}. Lendo a temperatura…");
+                    return;
+                }
+                _pendingToken = token;
+                _acChoices = list;
+                AcPickBox.ItemsSource = list.Select(a => a.Model.Length > 0 ? $"{a.Name} ({a.Model})" : a.Name).ToList();
+                AcPickRow.Visibility = Visibility.Visible;
+                AcMessage("Escolha qual ar-condicionado mostrar.");
+            }
+            catch (Exception ex) { AcMessage(ex.Message); }
+        }
+
+        private void OnAcPicked(object sender, SelectionChangedEventArgs e)
+        {
+            int i = AcPickBox.SelectedIndex;
+            if (i < 0 || _pendingToken == null || _acChoices == null || i >= _acChoices.Count) return;
+            var a = _acChoices[i];
+            AcService.Save(_cfg, _pendingToken, a.Id, a.Name);
+            _pendingToken = null;
+            AcTokenBox.Clear();
+            AcPickRow.Visibility = Visibility.Collapsed;
+            AcMessage($"Conectado: {a.Name}. Lendo a temperatura…");
+        }
+
+        private void OnAcForget(object sender, RoutedEventArgs e)
+        {
+            AcService.Forget(_cfg);
+            AcMessage("Ar desconectado do Pixo (o ControleTV continua como estava).");
+        }
+
+        private void OnAcSite(object sender, RoutedEventArgs e) => OpenUrl("https://connect-pat.lgthinq.com");
+
+        // ---------------- Pixo API e Claude Code ----------------
+
+        private void RefreshApiPage()
+        {
+            ApiStatusText.Text = PixoApi.Port > 0 ? $"Ouvindo em http://127.0.0.1:{PixoApi.Port} (só este PC)"
+                : PixoApi.Error ?? "Desligada";
+            bool on = ClaudeHooks.IsInstalled(_cfg.ApiPort);
+            ClaudeButton.Content = on ? "Desligar" : "Ligar";
+            if (DateTime.Now >= _claudeMsgUntil)
+                ClaudeStatusText.Text = on
+                    ? "Ligado: o Fred e o Dengo avisam quando o Claude Code te chama ou termina"
+                    : "Quando o Claude Code precisa de você ou termina, o Fred e o Dengo avisam na tela";
+        }
+
+        private void ClaudeMessage(string text)
+        {
+            ClaudeStatusText.Text = text;
+            _claudeMsgUntil = DateTime.Now.AddSeconds(6);
+        }
+
+        private void OnApiToggled(object sender, RoutedEventArgs e) => PixoApi.Restart();
+
+        private void OnApiPort(object sender, RoutedEventArgs e)
+        {
+            if (!int.TryParse(ApiPortBox.Text.Trim(), out var port) || port < 1024 || port > 65535)
+            {
+                ApiPortBox.Text = _cfg.ApiPort.ToString();
+                ClaudeMessage("A porta tem que ser um número entre 1024 e 65535.");
+                return;
+            }
+            bool hooked = ClaudeHooks.IsInstalled(_cfg.ApiPort);
+            _cfg.ApiPort = port;
+            PixoApi.Restart();
+            if (hooked) ClaudeMessage(ClaudeHooks.Install(port) ?? "Porta trocada; o Claude Code já usa a nova.");
+        }
+
+        private void OnClaudeToggle(object sender, RoutedEventArgs e)
+        {
+            bool on = ClaudeHooks.IsInstalled(_cfg.ApiPort);
+            var err = on ? ClaudeHooks.Uninstall() : ClaudeHooks.Install(_cfg.ApiPort);
+            ClaudeMessage(err ?? (on ? "Desligado do Claude Code." : "Ligado! Vale para as próximas sessões do Claude Code."));
+            RefreshApiPage();
+        }
+
+        private void OnClaudeTest(object sender, RoutedEventArgs e)
+        {
+            App.Engine.Post("evento:claude-espera");
+            ClaudeMessage("Olhe a tela: a dupla deve avisar que o Claude te chamou.");
+        }
+
+        private void OnClaudeCopy(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                Clipboard.SetText(ClaudeHooks.Snippet(_cfg.ApiPort));
+                ClaudeMessage("Configuração copiada. Cole no settings.json do Claude Code.");
+            }
+            catch { ClaudeMessage("Não deu para copiar agora. Tente de novo."); }
         }
 
         private void FillMics()
@@ -242,7 +433,7 @@ namespace Pixo.UI
         private void OnNavChanged(object sender, SelectionChangedEventArgs e)
         {
             if (Nav.SelectedItem is not NavItem item) return;
-            foreach (var name in new[] { "PageHome", "PageScreens", "PageDevice", "PagePet", "PageVoice", "PageGames", "PageDownloads", "PageImages", "PageGeneral" })
+            foreach (var name in new[] { "PageHome", "PageScreens", "PageDevice", "PagePet", "PageWeather", "PageVoice", "PageGames", "PageDownloads", "PageImages", "PageGeneral" })
             {
                 if (FindName(name) is FrameworkElement page)
                     page.Visibility = name == item.Page ? Visibility.Visible : Visibility.Collapsed;

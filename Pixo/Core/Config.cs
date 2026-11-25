@@ -85,6 +85,51 @@ namespace Pixo.Core
         private double _petSleepMinutes = 5;
         public double PetSleepMinutes { get => _petSleepMinutes; set => Set(ref _petSleepMinutes, Math.Clamp(Math.Round(value), 1, 120)); }
 
+        private double _petMood = 70;
+        /// <summary>Humor da dupla (0–100): sobe com carinho, cai devagar quando eles ficam sem atenção.</summary>
+        public double PetMood { get => _petMood; set => Set(ref _petMood, Math.Clamp(value, 0, 100)); }
+
+        private DateTime _petMoodAt = DateTime.Now;
+        /// <summary>Quando o humor foi atualizado pela última vez (para descontar o tempo com o Pixo fechado).</summary>
+        public DateTime PetMoodAt { get => _petMoodAt; set => Set(ref _petMoodAt, value); }
+
+        private double _petBreakMinutes = 90;
+        /// <summary>Depois de quanto tempo seguido no PC a dupla lembra de fazer uma pausa (0 = nunca).</summary>
+        public double PetBreakMinutes { get => _petBreakMinutes; set => Set(ref _petBreakMinutes, Math.Clamp(Math.Round(value / 15) * 15, 0, 240)); }
+
+        // ---------------- Clima ----------------
+        private string _weatherCity = "";
+        /// <summary>Vazio = descobre a cidade pela internet. Senão, o nome da cidade (ex.: "Campinas").</summary>
+        public string WeatherCity { get => _weatherCity; set => Set(ref _weatherCity, (value ?? "").Trim()); }
+
+        // ---------------- Ar-condicionado LG (ThinQ Connect) ----------------
+        private string _acTokenProtected = "";
+        /// <summary>Token pessoal da LG, criptografado para este usuário do Windows (DPAPI). Nunca em texto puro.</summary>
+        public string AcTokenProtected { get => _acTokenProtected; set => Set(ref _acTokenProtected, value ?? ""); }
+
+        private string _acDeviceId = "";
+        public string AcDeviceId { get => _acDeviceId; set => Set(ref _acDeviceId, value ?? ""); }
+
+        private string _acName = "";
+        public string AcName { get => _acName; set => Set(ref _acName, value ?? ""); }
+
+        private string _acCountry = "BR";
+        public string AcCountry { get => _acCountry; set => Set(ref _acCountry, string.IsNullOrWhiteSpace(value) ? "BR" : value.Trim().ToUpperInvariant()); }
+
+        private string _acClientId = "";
+        /// <summary>A LG pede um id fixo para cada programa cliente: um aleatório, criado uma vez.</summary>
+        public string AcClientId { get => _acClientId; set => Set(ref _acClientId, value ?? ""); }
+
+        // ---------------- Pixo API (avisos de outros programas, ex.: Claude Code) ----------------
+        private bool _apiEnabled = true;
+        public bool ApiEnabled { get => _apiEnabled; set => Set(ref _apiEnabled, value); }
+
+        private int _apiPort = 7480;
+        public int ApiPort { get => _apiPort; set => Set(ref _apiPort, Math.Clamp(value, 1024, 65535)); }
+
+        /// <summary>Até qual versão os comandos de voz novos já foram acrescentados (para não voltar os que você apagou).</summary>
+        public int VoiceDefaultsVersion { get; set; }
+
         // ---------------- Voz ----------------
         private bool _voiceEnabled = true;
         public bool VoiceEnabled { get => _voiceEnabled; set => Set(ref _voiceEnabled, value); }
@@ -167,7 +212,21 @@ namespace Pixo.Core
             Screens = list;
 
             if (VoiceCommands == null || VoiceCommands.Count == 0)
+            {
                 VoiceCommands = DefaultVoiceCommands();
+                VoiceDefaultsVersion = 2;
+            }
+            else if (VoiceDefaultsVersion < 2)
+            {
+                // versão 2: clima e carinho (acrescenta só o que ainda não existe)
+                var list2 = VoiceCommands.ToList();
+                foreach (var c in DefaultVoiceCommands().Where(c => c.Action == "clima" || c.Action == "carinho"))
+                    if (!list2.Any(v => string.Equals(v.Phrase, c.Phrase, StringComparison.OrdinalIgnoreCase)))
+                        list2.Add(c);
+                VoiceCommands = list2;
+                VoiceDefaultsVersion = 2;
+            }
+            if (string.IsNullOrEmpty(AcClientId)) AcClientId = "pixo-" + Guid.NewGuid().ToString("N");
         }
 
         public static List<VoiceCommand> DefaultVoiceCommands() => new List<VoiceCommand>
@@ -181,6 +240,9 @@ namespace Pixo.Core
             new VoiceCommand { Phrase = "baixando", Action = "downloads" },
             new VoiceCommand { Phrase = "bichinho", Action = "bichinho" },
             new VoiceCommand { Phrase = "bichinhos", Action = "bichinho" },
+            new VoiceCommand { Phrase = "carinho", Action = "carinho" },
+            new VoiceCommand { Phrase = "clima", Action = "clima" },
+            new VoiceCommand { Phrase = "tempo", Action = "clima" },
             new VoiceCommand { Phrase = "jogo", Action = "gamer" },
             new VoiceCommand { Phrase = "imagem", Action = "imagem" },
             new VoiceCommand { Phrase = "foto", Action = "imagem" },
@@ -206,7 +268,7 @@ namespace Pixo.Core
     public static class ScreenInfo
     {
         public static readonly string[] RotationIds =
-            { "temperaturas", "musica", "notificacoes", "downloads", "bichinho", "imagem", "relogio" };
+            { "temperaturas", "musica", "notificacoes", "downloads", "bichinho", "clima", "imagem", "relogio" };
 
         public static string Name(string id) => id switch
         {
@@ -215,6 +277,7 @@ namespace Pixo.Core
             "notificacoes" => "Notificações",
             "downloads" => "Downloads",
             "bichinho" => "Bichinhos",
+            "clima" => "Clima",
             "imagem" => "Imagem",
             "relogio" => "Relógio",
             "gamer" => "Modo Gamer",
@@ -228,6 +291,7 @@ namespace Pixo.Core
             "notificacoes" => "Só aparece quando tem notificação",
             "downloads" => "Só aparece quando tem download",
             "bichinho" => "Fred e Dengo, que reagem ao seu PC",
+            "clima" => "Tempo lá fora e, com o ar LG, no quarto",
             "imagem" => "Suas fotos, uma por vez",
             "relogio" => "Hora e data em letras grandes",
             _ => ""
@@ -240,6 +304,7 @@ namespace Pixo.Core
             "notificacoes" => "bell",
             "downloads" => "download",
             "bichinho" => "pet",
+            "clima" => "cloudSun",
             "imagem" => "image",
             "relogio" => "clock",
             "gamer" => "gamepad",
@@ -254,6 +319,8 @@ namespace Pixo.Core
             ("notificacoes", "Mostrar Notificações"),
             ("downloads", "Mostrar Downloads"),
             ("bichinho", "Mostrar Bichinhos"),
+            ("clima", "Mostrar Clima"),
+            ("carinho", "Fazer carinho nos bichinhos"),
             ("imagem", "Mostrar Imagem"),
             ("relogio", "Mostrar Relógio"),
             ("gamer", "Mostrar Modo Gamer"),

@@ -52,9 +52,12 @@ namespace Pixo
             NotificationService.Start();
             DownloadService.Start(() => Cfg);
             GameService.Start(() => Cfg);
+            WeatherService.Start(() => Cfg);
+            AcService.Start(() => Cfg);
 
             Engine = new Engine(Cfg);
             Engine.Start();
+            PixoApi.Start(() => Cfg, action => Engine.Post(action));
 
             Voice = new VoiceListener(Cfg, action => Engine.Post(action, fromVoice: true));
             // se a última carga do modelo de voz derrubou o app, abre com a voz desligada
@@ -91,6 +94,9 @@ namespace Pixo
             try { NotificationService.Stop(); } catch { }
             try { DownloadService.Stop(); } catch { }
             try { GameService.Stop(); } catch { }
+            try { WeatherService.Stop(); } catch { }
+            try { AcService.Stop(); } catch { }
+            try { PixoApi.Stop(); } catch { }
             _tray?.Dispose();
             _main?.Close();
             Shutdown();

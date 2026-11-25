@@ -49,6 +49,12 @@ namespace Pixo.UI
         private void OnNext(object sender, RoutedEventArgs e) => App.Engine.Post("proxima");
         private void OnPause(object sender, RoutedEventArgs e) => App.Engine.Post("alternar_pausa");
 
+        private void OnCarinho(object sender, RoutedEventArgs e)
+        {
+            Hide();
+            App.Engine.Post("carinho");
+        }
+
         private void OnSettings(object sender, RoutedEventArgs e)
         {
             Hide();

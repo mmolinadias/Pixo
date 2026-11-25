@@ -40,6 +40,7 @@ namespace Pixo.Core
         private bool _appliedFlip;
         private bool _screenOff;
         private DateTime _lastPreview = DateTime.MinValue;
+        private PetLife _life;
 
         // ---- estado público (lido pela interface) ----
         public bool Connected => _display != null;
@@ -72,11 +73,15 @@ namespace Pixo.Core
             _screens["musica"] = new MusicScreen();
             _screens["notificacoes"] = new NotificationsScreen();
             _screens["downloads"] = new DownloadsScreen();
-            _screens["bichinho"] = new PetScreen(() => _cfg);
+            var pet = new PetScreen(() => _cfg);
+            _screens["bichinho"] = pet;
+            _screens["clima"] = new WeatherScreen(() => _cfg);
             _screens["imagem"] = new ImageScreen(() => _cfg);
             _screens["relogio"] = new ClockScreen();
             _screens["gamer"] = new GamerScreen();
             _screens["boasvindas"] = new WelcomeScreen(() => _cfg);
+
+            _life = new PetLife(_cfg, pet, () => ShowPetsForAWhile());
 
             NotificationService.NewArrived += () => (_screens["bichinho"] as PetScreen)?.React("susto");
             DownloadService.Finished += () => (_screens["bichinho"] as PetScreen)?.React("comemora");
@@ -119,6 +124,7 @@ namespace Pixo.Core
                     HandleCommands();
                     HandleGameMode();
                     HandleRotation();
+                    _life?.Tick();
                     ApplyDisplaySettings();
                     if (DateTime.Now >= _nextRender) RenderAndSend();
                 }
@@ -280,6 +286,14 @@ namespace Pixo.Core
                 var a = voice ? raw.Substring(4) : raw;
 
                 if (a.StartsWith("midia:")) { MediaService.Command(a.Substring(6)); continue; }
+                if (a.StartsWith("evento:")) { HandleEvent(a.Substring(7)); continue; }
+                if (a.StartsWith("msg:"))
+                {
+                    Pet?.Say("RECADO", a.Substring(4), 30);
+                    ShowPetsForAWhile();
+                    continue;
+                }
+                if (a == "carinho") { _life?.Carinho(); continue; }
 
                 switch (a)
                 {
@@ -316,6 +330,48 @@ namespace Pixo.Core
                 // o símbolo de pausa no cabeçalho muda
                 _nextRender = DateTime.MinValue;
                 StatusChanged?.Invoke();
+            }
+        }
+
+        // ---------------- bichinhos: eventos de fora ----------------
+
+        private PetScreen Pet => _screens.TryGetValue("bichinho", out var s) ? s as PetScreen : null;
+
+        /// <summary>Mostra a tela dos bichinhos por um tempo (fora do Modo Gamer), pausando a rotação.</summary>
+        private void ShowPetsForAWhile(double seconds = 30)
+        {
+            if (_inGame) return;
+            Show("bichinho", true);
+            _pausedUntil = DateTime.Now.AddSeconds(seconds);
+            _nextRender = DateTime.MinValue;
+            StatusChanged?.Invoke();
+        }
+
+        /// <summary>Eventos da Pixo API (ex.: o Claude Code).</summary>
+        private void HandleEvent(string name)
+        {
+            var pet = Pet;
+            if (pet == null) return;
+            switch (name)
+            {
+                case "claude-espera":
+                    pet.React("susto");
+                    pet.Say("CLAUDE", "O Claude tá te chamando! Dá uma olhada lá.", 45);
+                    ShowPetsForAWhile(45);
+                    break;
+                case "claude-pronto":
+                    pet.React("comemora");
+                    pet.Say("CLAUDE", "O Claude terminou! Bora ver o que ele fez?", 30);
+                    ShowPetsForAWhile();
+                    break;
+                case "comemora":
+                case "susto":
+                    pet.React(name);
+                    ShowPetsForAWhile(15);
+                    break;
+                case "carinho":
+                    _life?.Carinho();
+                    break;
             }
         }
 
