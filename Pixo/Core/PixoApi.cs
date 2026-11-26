@@ -17,6 +17,7 @@ namespace Pixo.Core
     ///   curl -X POST http://127.0.0.1:7480/evento/claude-pronto     → a dupla comemora: o Claude terminou
     ///   curl -X POST http://127.0.0.1:7480/mensagem -d "Pizza chegou!"
     ///   curl http://127.0.0.1:7480/tela/clima                        → mostra uma tela
+    ///   curl http://127.0.0.1:7480/bichinhos/quente                → testa uma animação na tela (30 s)
     ///   curl http://127.0.0.1:7480/status
     ///   (hooks do Claude Code)  curl -X POST http://127.0.0.1:7480/claude --data-binary @-   → painel do Claude Code
     /// Só aceita conexões do próprio PC, e recusa pedidos feitos por páginas da web (cabeçalho Origin).
@@ -145,6 +146,15 @@ namespace Pixo.Core
                     _post("claude:atualizou");
                     return (200, Obj(true));
                 }
+
+                case "bichinhos":
+                    // teste de animação na tela: /bichinhos/quente (30 s) ou /bichinhos/ao-vivo
+                    if (parts.Length == 2 && (parts[1] == "ao-vivo" || Render.Pets.States.ContainsKey(parts[1])))
+                    {
+                        _post("bichinhos:" + parts[1]);
+                        return (200, Obj(true));
+                    }
+                    return (404, Obj(false, "Animações: " + string.Join(", ", Render.Pets.States.Keys) + " (ou ao-vivo)"));
 
                 case "tela" when parts.Length == 2:
                     _post(parts[1]);

@@ -313,6 +313,8 @@
                             <StackPanel Orientation="Horizontal" Margin="0,8,0,12">
                                 <TextBlock x:Name="PetPreviewHint" Text="Mostrando o humor de agora" Style="{StaticResource RowHint}" VerticalAlignment="Center" Margin="0,0,12,0" />
                                 <ComboBox x:Name="PetStateBox" Width="260" SelectionChanged="OnPetStateChanged" />
+                                <ui:Button x:Name="PetShowButton" Content="Mostrar na tela" Margin="8,0,0,0" Click="OnPetShowOnScreen" IsEnabled="False"
+                                           ToolTip="Toca esta animação na tela física por 30 segundos" />
                             </StackPanel>
                             <ui:CardControl Style="{StaticResource Row}">
                                 <ui:CardControl.Header>

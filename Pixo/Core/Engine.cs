@@ -307,6 +307,14 @@ namespace Pixo.Core
                     continue;
                 }
                 if (a == "carinho") { _life?.Carinho(); continue; }
+                if (a.StartsWith("bichinhos:"))
+                {
+                    // teste de animação: "bichinhos:quente" toca por 30 s; "bichinhos:ao-vivo" volta ao normal
+                    var st = a.Substring(10);
+                    if (st == "ao-vivo") Pet?.StopPreview();
+                    else { Pet?.Preview(st, 30); ShowPetsForAWhile(30); }
+                    continue;
+                }
                 if (a.StartsWith("saude-aviso:"))
                 {
                     Pet?.React("susto");

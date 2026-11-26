@@ -775,6 +775,22 @@ namespace Pixo.Render
 
         public static bool IsNight(DateTime t) => t.Hour >= 23 || t.Hour < 6;
 
+        // teste: uma animação escolhida na janela (ou pela API) toca na tela por um tempo, ignorando o PC
+        private string _forced;
+        private DateTime _forcedUntil;
+
+        /// <summary>Toca esta animação na tela por alguns segundos (as reações repetem até acabar o tempo).</summary>
+        public void Preview(string state, double seconds = 30)
+        {
+            if (!Pets.States.ContainsKey(state)) return;
+            _forced = state;
+            _forcedUntil = DateTime.Now.AddSeconds(seconds);
+            _nextFrame = DateTime.MinValue; // troca já
+        }
+
+        /// <summary>Volta para o "ao vivo" (o que o PC estiver fazendo).</summary>
+        public void StopPreview() { _forced = null; _nextFrame = DateTime.MinValue; }
+
         // redesenha ~25 vezes por segundo; a dupla é desenhada "entre poses" (interpolada),
         // então a animação fica fluida. Só o pedaço que mudou vai para a tela.
         public override TimeSpan Interval => TimeSpan.FromMilliseconds(40);
@@ -834,8 +850,11 @@ namespace Pixo.Render
                 return;
             }
 
-            string target = BaseState();
-            if (_reaction != null && now < _reactionUntil) { target = _reaction; _reaction = null; }
+            bool forcing = _forced != null && now < _forcedUntil;
+            if (!forcing) _forced = null;
+            string target = forcing ? _forced : BaseState();
+            if (forcing) { }
+            else if (_reaction != null && now < _reactionUntil) { target = _reaction; _reaction = null; }
             else if (_reaction != null) _reaction = null;
             else if (target == "feliz" && now > _nextHeart && (_state == "feliz" || !Pets.States[_state].Loop))
             {
@@ -846,11 +865,15 @@ namespace Pixo.Render
             }
 
             bool reactionPlaying = !info.Loop && !_oneShotDone;
-            if (reactionPlaying && target != "susto" && target != "comemora")
+            if (forcing && target == _state && !info.Loop && _oneShotDone)
+            {
+                _frame = 0; _oneShotDone = false; // no teste, a reação repete
+            }
+            else if (!forcing && reactionPlaying && target != "susto" && target != "comemora")
             {
                 _frame++; // termina a reação antes de trocar
             }
-            else if (target != _state && (info.Loop || _oneShotDone || target == "susto" || target == "comemora"))
+            else if (target != _state && (forcing || info.Loop || _oneShotDone || target == "susto" || target == "comemora"))
             {
                 _from = _state; _fromPos = Position(); _changedAt = now; // o corpo desliza da pose antiga
                 _state = target; _frame = 0; _oneShotDone = false;

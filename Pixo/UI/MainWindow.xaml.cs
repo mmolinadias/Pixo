@@ -283,6 +283,13 @@ namespace Pixo.UI
 
         private void OnPetCarinho(object sender, RoutedEventArgs e) => App.Engine.Post("carinho");
 
+        private void OnPetShowOnScreen(object sender, RoutedEventArgs e)
+        {
+            if (PetStateBox.SelectedIndex <= 0) return;
+            App.Engine.Post("bichinhos:" + Pets.States.Keys.ElementAt(PetStateBox.SelectedIndex - 1));
+            PetPreviewHint.Text = "Tocando na tela por 30 s";
+        }
+
         // ---------------- Clima ----------------
 
         private void RefreshWeatherPage()
@@ -594,6 +601,7 @@ namespace Pixo.UI
         {
             PetPreviewHint.Text = PetStateBox.SelectedIndex <= 0 ? "Mostrando o humor de agora" : "Mostrando um humor específico";
             _petNext = DateTime.MinValue;
+            if (PetShowButton != null) PetShowButton.IsEnabled = PetStateBox.SelectedIndex > 0;
         }
 
         // ---------------- Voz ----------------
