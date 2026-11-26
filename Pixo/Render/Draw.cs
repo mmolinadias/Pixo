@@ -294,6 +294,9 @@ namespace Pixo.Render
             ["ac"] = "M3 5h18v8H3Z M6 10h12 M8 16.5v2.5 M12 16.5v3.5 M16 16.5v2.5",
             // Claude Code
             ["claude"] = "M12 3v18 M4.2 7.5l15.6 9 M4.2 16.5l15.6-9",
+            ["pulse"] = "M3 12h4l2.5-6 4 12 2.5-6H21",
+            ["disk"] = "M4 6h16v12H4Z M7.5 14.5h.01 M11 14.5h6",
+            ["restart"] = "M4 12a8 8 0 1 0 2.3-5.7 M4 4v4.5h4.5",
             ["edit"] = "M4 20h4L19 9l-4-4L4 16Z M13.5 6.5l4 4",
             ["doc"] = "M6 3h8l4 4v14H6Z M14 3v4h4 M9 12h6 M9 16h6",
             ["terminal"] = "M3 5h18v14H3Z M7 9l3 3-3 3 M12 15h5",

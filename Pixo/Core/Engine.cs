@@ -42,6 +42,8 @@ namespace Pixo.Core
         private DateTime _lastPreview = DateTime.MinValue;
         private PetLife _life;
 
+        private AppFocus _focus;
+
         // ---- estado público (lido pela interface) ----
         public bool Connected => _display != null;
         public string PortName => _display?.PortName;
@@ -77,13 +79,16 @@ namespace Pixo.Core
             _screens["bichinho"] = pet;
             _screens["clima"] = new WeatherScreen(() => _cfg);
             _screens["claude"] = new ClaudeScreen();
+            _screens["saude"] = new HealthScreen();
             _screens["imagem"] = new ImageScreen(() => _cfg);
             _screens["relogio"] = new ClockScreen();
             _screens["gamer"] = new GamerScreen();
             _screens["boasvindas"] = new WelcomeScreen(() => _cfg);
 
             _life = new PetLife(_cfg, pet, () => ShowPetsForAWhile());
+            _focus = new AppFocus(() => _cfg);
 
+            HealthService.NewWarning += text => Post("saude-aviso:" + text);
             NotificationService.NewArrived += () => (_screens["bichinho"] as PetScreen)?.React("susto");
             DownloadService.Finished += () => (_screens["bichinho"] as PetScreen)?.React("comemora");
 
@@ -124,6 +129,7 @@ namespace Pixo.Core
                     EnsureConnected();
                     HandleCommands();
                     HandleGameMode();
+                    HandleAppScreen();
                     HandleRotation();
                     _life?.Tick();
                     ApplyDisplaySettings();
@@ -257,7 +263,7 @@ namespace Pixo.Core
 
         private void HandleRotation()
         {
-            if (_inGame || !_autoRotate || DateTime.Now < _pausedUntil) return;
+            if (_inGame || _focus?.Mode != null || !_autoRotate || DateTime.Now < _pausedUntil) return;
             if ((DateTime.Now - _shownAt).TotalSeconds >= _cfg.SecondsPerScreen) Step(1);
             // a tela atual ficou sem conteúdo (ex.: a música parou): passa para a próxima
             else if (_current != null && !_current.HasContent && (DateTime.Now - _shownAt).TotalSeconds > 3) Step(1);
@@ -301,11 +307,18 @@ namespace Pixo.Core
                     continue;
                 }
                 if (a == "carinho") { _life?.Carinho(); continue; }
+                if (a.StartsWith("saude-aviso:"))
+                {
+                    Pet?.React("susto");
+                    Pet?.Say("SAÚDE", a.Substring(12), 60);
+                    if (!_inGame) { Show("saude", true); _pausedUntil = DateTime.Now.AddSeconds(30); }
+                    continue;
+                }
 
                 switch (a)
                 {
-                    case "proxima": Step(1); break;
-                    case "anterior": Step(-1); break;
+                    case "proxima": LeaveAppMode(); Step(1); break;
+                    case "anterior": LeaveAppMode(); Step(-1); break;
                     case "pausar_rotacao": _autoRotate = false; break;
                     case "continuar": _autoRotate = true; _pausedUntil = DateTime.MinValue; break;
                     case "alternar_pausa":
@@ -328,6 +341,7 @@ namespace Pixo.Core
                     default:
                         if (_screens.ContainsKey(a) && a != "boasvindas")
                         {
+                            LeaveAppMode();
                             Show(a, true);
                             if (voice && _cfg.PauseAfterVoice > 0)
                                 _pausedUntil = DateTime.Now.AddSeconds(_cfg.PauseAfterVoice);
@@ -339,6 +353,24 @@ namespace Pixo.Core
                 StatusChanged?.Invoke();
             }
         }
+
+        // ---------------- tela por app em foco ----------------
+
+        private void HandleAppScreen()
+        {
+            if (_focus == null) return;
+            var now = DateTime.Now;
+            var show = _focus.Tick(GameService.ForegroundExe, now, _inGame, now < _pausedUntil, _current?.Id,
+                id => _screens.TryGetValue(id, out var sc) && sc.HasContent);
+            if (show == "") _shownAt = now;
+            else if (show != null) Show(show, true);
+        }
+
+        /// <summary>Você trocou de tela na mão: o app em foco não força mais a tela dele (até você trocar de app).</summary>
+        private void LeaveAppMode() => _focus?.Manual();
+
+        /// <summary>Tela escolhida pelo app em foco agora (null = rotação normal). Para a janela mostrar.</summary>
+        public string AppScreen => _focus?.Mode;
 
         // ---------------- bichinhos: eventos de fora ----------------
 

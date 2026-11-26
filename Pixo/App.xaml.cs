@@ -54,6 +54,7 @@ namespace Pixo
             GameService.Start(() => Cfg);
             WeatherService.Start(() => Cfg);
             AcService.Start(() => Cfg);
+            HealthService.Start();
 
             Engine = new Engine(Cfg);
             Engine.Start();
@@ -108,6 +109,7 @@ namespace Pixo
             try { GameService.Stop(); } catch { }
             try { WeatherService.Stop(); } catch { }
             try { AcService.Stop(); } catch { }
+            try { HealthService.Stop(); } catch { }
             try { PixoApi.Stop(); } catch { }
             try { Updater.Stop(); Updater.ApplyOnExit(); } catch { }
             _tray?.Dispose();

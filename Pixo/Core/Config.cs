@@ -21,6 +21,13 @@ namespace Pixo.Core
         public string Action { get; set; }
     }
 
+    /// <summary>"Quando este app estiver em foco, mostrar esta tela."</summary>
+    public class AppScreenRule
+    {
+        public string App { get; set; }      // nome do .exe, ex.: spotify.exe
+        public string Screen { get; set; }   // id da tela, ex.: musica
+    }
+
     /// <summary>Todas as configurações do Pixo. Salvas em %AppData%\Pixo\config.json.</summary>
     public class Config : INotifyPropertyChanged
     {
@@ -144,6 +151,14 @@ namespace Pixo.Core
         private List<VoiceCommand> _voiceCommands = new List<VoiceCommand>();
         public List<VoiceCommand> VoiceCommands { get => _voiceCommands; set => Set(ref _voiceCommands, value); }
 
+        // ---------------- Tela por app em foco ----------------
+        private bool _appScreensEnabled = true;
+        public bool AppScreensEnabled { get => _appScreensEnabled; set => Set(ref _appScreensEnabled, value); }
+
+        private List<AppScreenRule> _appScreens;
+        /// <summary>Regras "app em foco → tela" (null = ainda não criadas: usa as padrão).</summary>
+        public List<AppScreenRule> AppScreens { get => _appScreens; set => Set(ref _appScreens, value); }
+
         // ---------------- Jogos ----------------
         private bool _gameModeAuto = true;
         public bool GameModeAuto { get => _gameModeAuto; set => Set(ref _gameModeAuto, value); }
@@ -214,7 +229,7 @@ namespace Pixo.Core
             if (VoiceCommands == null || VoiceCommands.Count == 0)
             {
                 VoiceCommands = DefaultVoiceCommands();
-                VoiceDefaultsVersion = 2;
+                VoiceDefaultsVersion = 3;
             }
             else if (VoiceDefaultsVersion < 2)
             {
@@ -226,6 +241,17 @@ namespace Pixo.Core
                 VoiceCommands = list2;
                 VoiceDefaultsVersion = 2;
             }
+            if (VoiceDefaultsVersion < 3)
+            {
+                // versão 3: saúde do PC
+                var list3 = VoiceCommands.ToList();
+                foreach (var c in DefaultVoiceCommands().Where(c => c.Action == "saude"))
+                    if (!list3.Any(v => string.Equals(v.Phrase, c.Phrase, StringComparison.OrdinalIgnoreCase)))
+                        list3.Add(c);
+                VoiceCommands = list3;
+                VoiceDefaultsVersion = 3;
+            }
+            AppScreens ??= DefaultAppScreens();
             if (string.IsNullOrEmpty(AcClientId)) AcClientId = "pixo-" + Guid.NewGuid().ToString("N");
         }
 
@@ -243,6 +269,7 @@ namespace Pixo.Core
             new VoiceCommand { Phrase = "carinho", Action = "carinho" },
             new VoiceCommand { Phrase = "clima", Action = "clima" },
             new VoiceCommand { Phrase = "tempo", Action = "clima" },
+            new VoiceCommand { Phrase = "saúde", Action = "saude" },
             new VoiceCommand { Phrase = "jogo", Action = "gamer" },
             new VoiceCommand { Phrase = "imagem", Action = "imagem" },
             new VoiceCommand { Phrase = "foto", Action = "imagem" },
@@ -259,6 +286,20 @@ namespace Pixo.Core
             new VoiceCommand { Phrase = "pular", Action = "midia:pular" },
         };
 
+        public static List<AppScreenRule> DefaultAppScreens() => new List<AppScreenRule>
+        {
+            new AppScreenRule { App = "spotify.exe", Screen = "musica" },
+            new AppScreenRule { App = "qbittorrent.exe", Screen = "downloads" },
+            new AppScreenRule { App = "code.exe", Screen = "claude" },
+            new AppScreenRule { App = "devenv.exe", Screen = "claude" },
+            new AppScreenRule { App = "windowsterminal.exe", Screen = "claude" },
+            new AppScreenRule { App = "claude.exe", Screen = "claude" },
+            new AppScreenRule { App = "blender.exe", Screen = "temperaturas" },
+            new AppScreenRule { App = "resolve.exe", Screen = "temperaturas" },
+            new AppScreenRule { App = "handbrake.exe", Screen = "temperaturas" },
+            new AppScreenRule { App = "obs64.exe", Screen = "temperaturas" },
+        };
+
         public string[] ExtraGamesList() =>
             ExtraGames.Split(new[] { '\n', '\r', ';', ',' }, StringSplitOptions.RemoveEmptyEntries)
                       .Select(s => s.Trim().ToLowerInvariant()).Where(s => s.Length > 0).ToArray();
@@ -268,7 +309,7 @@ namespace Pixo.Core
     public static class ScreenInfo
     {
         public static readonly string[] RotationIds =
-            { "temperaturas", "musica", "notificacoes", "downloads", "bichinho", "clima", "claude", "imagem", "relogio" };
+            { "temperaturas", "musica", "notificacoes", "downloads", "bichinho", "clima", "claude", "saude", "imagem", "relogio" };
 
         public static string Name(string id) => id switch
         {
@@ -279,6 +320,7 @@ namespace Pixo.Core
             "bichinho" => "Bichinhos",
             "clima" => "Clima",
             "claude" => "Claude Code",
+            "saude" => "Saúde do PC",
             "imagem" => "Imagem",
             "relogio" => "Relógio",
             "gamer" => "Modo Gamer",
@@ -294,6 +336,7 @@ namespace Pixo.Core
             "bichinho" => "Fred e Dengo, que reagem ao seu PC",
             "clima" => "Tempo lá fora e, com o ar LG, no quarto",
             "claude" => "O que o Claude Code está fazendo (só aparece com uma sessão aberta)",
+            "saude" => "Disco, reinício, atualização e temperatura (só aparece quando tem aviso)",
             "imagem" => "Suas fotos, uma por vez",
             "relogio" => "Hora e data em letras grandes",
             _ => ""
@@ -308,6 +351,7 @@ namespace Pixo.Core
             "bichinho" => "pet",
             "clima" => "cloudSun",
             "claude" => "claude",
+            "saude" => "pulse",
             "imagem" => "image",
             "relogio" => "clock",
             "gamer" => "gamepad",
@@ -324,6 +368,7 @@ namespace Pixo.Core
             ("bichinho", "Mostrar Bichinhos"),
             ("clima", "Mostrar Clima"),
             ("claude", "Mostrar Claude Code"),
+            ("saude", "Mostrar Saúde do PC"),
             ("carinho", "Fazer carinho nos bichinhos"),
             ("imagem", "Mostrar Imagem"),
             ("relogio", "Mostrar Relógio"),

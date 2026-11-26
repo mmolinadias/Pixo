@@ -32,6 +32,9 @@ namespace Pixo.Data
 
         public static volatile GameInfo Current;
 
+        /// <summary>Caminho do .exe do app em primeiro plano agora (null se não deu para ler).</summary>
+        public static volatile string ForegroundExe;
+
         private static readonly string[] GameFolders =
         {
             @"steamapps\common", @"epic games", @"riot games", @"gog galaxy\games", @"xboxgames",
@@ -53,13 +56,18 @@ namespace Pixo.Data
 
         private static void Tick()
         {
-            try { Current = Detect(); }
+            try
+            {
+                var fg = Foreground();
+                ForegroundExe = fg.exe;
+                Current = Detect(fg);
+            }
             catch { Current = null; }
         }
 
-        private static GameInfo Detect()
+        private static GameInfo Detect((int pid, string exe) fg)
         {
-            var (pid, exe) = Foreground();
+            var (pid, exe) = fg;
             if (pid == 0 || string.IsNullOrEmpty(exe)) return null;
             var path = exe.ToLowerInvariant();
             var file = Path.GetFileName(path);

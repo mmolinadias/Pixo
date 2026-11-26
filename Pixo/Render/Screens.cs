@@ -699,6 +699,43 @@ namespace Pixo.Render
     }
 
     // =====================================================================
+    // g4) SAÚDE DO PC
+    // =====================================================================
+    public class HealthScreen : Screen
+    {
+        public override string Id => "saude";
+        public override bool HasContent => HealthService.Warnings > 0;
+        public override TimeSpan Interval => TimeSpan.FromSeconds(5);
+
+        public override void Draw(DrawingContext dc, FrameCtx ctx)
+        {
+            D.Header(dc, Head(ctx, "pulse"));
+            var items = HealthService.Items;
+            int warn = items.Count(i => i.Level != HealthLevel.Ok);
+            D.Chip(dc, warn == 0 ? "TUDO CERTO" : warn == 1 ? "1 AVISO" : warn + " AVISOS", 150, 10, 20, Pal.S2, warn == 0 ? Pal.Ok : Pal.Warn, 12, 700, 8);
+            if (items.Length == 0)
+            {
+                D.Empty(dc, "pulse", Pal.Ink3, "Conferindo o PC…", "Leva só alguns segundos.", 78);
+                return;
+            }
+
+            // avisos primeiro
+            var list = items.OrderByDescending(i => i.Level).Take(5).ToList();
+            for (int i = 0; i < list.Count; i++)
+            {
+                var it = list[i];
+                double y = 48 + i * 53;
+                var col = it.Level == HealthLevel.Bad ? Pal.Hot : it.Level == HealthLevel.Warn ? Pal.Warn : Pal.Ok;
+                D.Card(dc, 12, y, 456, 47, Pal.S1, it.Level == HealthLevel.Ok ? null : new Pen(col, 1.5));
+                D.Icon(dc, it.Icon, 24, y + 13, 20, it.Level == HealthLevel.Ok ? Pal.Ink2 : col, 2);
+                D.Text(dc, it.Title, 56, y + 6, 380, 18, 14, 700, Pal.Ink);
+                D.Text(dc, it.Detail, 56, y + 25, 390, 16, 12, 600, it.Level == HealthLevel.Ok ? Pal.Ink3 : Pal.Ink2);
+                D.Dot(dc, 448, y + 19, 9, col);
+            }
+        }
+    }
+
+    // =====================================================================
     // h) BICHINHO
     // =====================================================================
     public class PetScreen : Screen

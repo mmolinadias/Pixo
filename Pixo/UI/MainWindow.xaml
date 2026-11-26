@@ -178,6 +178,33 @@
                                 </ui:CardControl.Header>
                                 <ui:ToggleSwitch IsChecked="{Binding OnlySpotify}" />
                             </ui:CardControl>
+
+                            <TextBlock Text="Tela por app em foco" Style="{StaticResource SectionTitle}" />
+                            <ui:CardControl Style="{StaticResource Row}">
+                                <ui:CardControl.Header>
+                                    <StackPanel>
+                                        <TextBlock Text="Acompanhar o app em foco" Style="{StaticResource RowTitle}" />
+                                        <TextBlock x:Name="AppScreenStatus" Text="Com um app da lista na frente, a tela dele fica parada; ao sair, a rotação volta" Style="{StaticResource RowHint}" TextWrapping="Wrap" MaxWidth="420" />
+                                    </StackPanel>
+                                </ui:CardControl.Header>
+                                <ui:ToggleSwitch IsChecked="{Binding AppScreensEnabled}" />
+                            </ui:CardControl>
+                            <DataGrid x:Name="AppGrid" AutoGenerateColumns="False" CanUserAddRows="False" HeadersVisibility="Column" Margin="0,4,0,0"
+                                      MaxHeight="300" CanUserResizeRows="False" SelectionMode="Single" CellEditEnding="OnAppRuleEdited">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="App (nome do .exe)" Binding="{Binding App, UpdateSourceTrigger=PropertyChanged}" Width="*" />
+                                    <DataGridComboBoxColumn x:Name="AppScreenColumn" Header="Mostra a tela" Width="*"
+                                                            SelectedValuePath="Id" DisplayMemberPath="Name"
+                                                            SelectedValueBinding="{Binding Screen, UpdateSourceTrigger=PropertyChanged}" />
+                                </DataGrid.Columns>
+                            </DataGrid>
+                            <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                <ui:Button Content="Adicionar" Margin="0,0,8,0" Click="OnAppRuleAdd" />
+                                <ui:Button Content="Remover" Margin="0,0,8,0" Click="OnAppRuleRemove" />
+                                <ui:Button Content="Restaurar padrão" Click="OnAppRuleReset" />
+                            </StackPanel>
+                            <TextBlock Margin="0,8,0,0" FontSize="12" Foreground="{StaticResource PixoText3}" TextWrapping="Wrap"
+                                       Text="A tela só aparece se tiver o que mostrar (ex.: Música só com algo tocando). Jogos continuam indo para o Modo Gamer. O app em foco agora aparece aqui em cima, para você copiar o nome." />
                         </StackPanel>
 
                         <!-- ===== Tela física ===== -->

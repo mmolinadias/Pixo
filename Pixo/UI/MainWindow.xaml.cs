@@ -42,6 +42,12 @@ namespace Pixo.UI
         public string Action { get; set; }
     }
 
+    public class AppRuleRow
+    {
+        public string App { get; set; }
+        public string Screen { get; set; }
+    }
+
     public class MicOption
     {
         public int Id { get; set; }
@@ -59,6 +65,7 @@ namespace Pixo.UI
         private readonly Config _cfg = App.Cfg;
         private readonly ObservableCollection<ScreenRow> _screens = new ObservableCollection<ScreenRow>();
         private readonly ObservableCollection<VoiceRow> _voice = new ObservableCollection<VoiceRow>();
+        private readonly ObservableCollection<AppRuleRow> _appRules = new ObservableCollection<AppRuleRow>();
         private readonly DispatcherTimer _timer;
         private bool _loading = true;
 
@@ -94,6 +101,11 @@ namespace Pixo.UI
             // Telas
             foreach (var s in _cfg.Screens) _screens.Add(new ScreenRow { Id = s.Id, Enabled = s.Enabled });
             ScreenList.ItemsSource = _screens;
+
+            // Tela por app em foco
+            AppScreenColumn.ItemsSource = ScreenInfo.RotationIds.Select(id => new ActionOption { Id = id, Name = ScreenInfo.Name(id) }).ToList();
+            LoadAppRules(_cfg.AppScreens ?? Config.DefaultAppScreens());
+            AppGrid.ItemsSource = _appRules;
 
             // Tela física
             OrientationBox.SelectedIndex = _cfg.Flipped ? 1 : 0;
@@ -211,11 +223,61 @@ namespace Pixo.UI
                 _slowTick = DateTime.Now;
                 if (PageWeather.Visibility == Visibility.Visible) RefreshWeatherPage();
                 if (PageGeneral.Visibility == Visibility.Visible) RefreshApiPage();
+                if (PageScreens.Visibility == Visibility.Visible) RefreshAppScreen();
             }
         }
 
         private DateTime _slowTick = DateTime.MinValue;
         private DateTime _acMsgUntil = DateTime.MinValue, _claudeMsgUntil = DateTime.MinValue;
+
+        // ---------------- Tela por app em foco ----------------
+
+        private void LoadAppRules(IEnumerable<AppScreenRule> rules)
+        {
+            _appRules.Clear();
+            foreach (var r in rules) _appRules.Add(new AppRuleRow { App = r.App, Screen = r.Screen });
+        }
+
+        private void SaveAppRules()
+        {
+            _cfg.AppScreens = _appRules.Where(r => !string.IsNullOrWhiteSpace(r.App) && !string.IsNullOrWhiteSpace(r.Screen))
+                                       .Select(r => new AppScreenRule { App = r.App.Trim().ToLowerInvariant(), Screen = r.Screen }).ToList();
+            _cfg.Save();
+        }
+
+        private void RefreshAppScreen()
+        {
+            var fg = Data.GameService.ForegroundExe;
+            string app = string.IsNullOrEmpty(fg) ? "—" : Path.GetFileName(fg).ToLowerInvariant();
+            var on = App.Engine.AppScreen;
+            AppScreenStatus.Text = !_cfg.AppScreensEnabled ? "Desligado: a rotação segue normal"
+                : on != null ? $"Agora: {app} está na frente, mostrando {ScreenInfo.Name(on)}"
+                : $"App em foco agora: {app} (sem regra, a rotação segue normal)";
+        }
+
+        private void OnAppRuleEdited(object sender, DataGridCellEditEndingEventArgs e) =>
+            Dispatcher.BeginInvoke(new Action(SaveAppRules), DispatcherPriority.Background);
+
+        private void OnAppRuleAdd(object sender, RoutedEventArgs e)
+        {
+            var row = new AppRuleRow { App = "app.exe", Screen = "temperaturas" };
+            _appRules.Add(row);
+            AppGrid.SelectedItem = row;
+            AppGrid.ScrollIntoView(row);
+            SaveAppRules();
+        }
+
+        private void OnAppRuleRemove(object sender, RoutedEventArgs e)
+        {
+            if (AppGrid.SelectedItem is AppRuleRow row) _appRules.Remove(row);
+            SaveAppRules();
+        }
+
+        private void OnAppRuleReset(object sender, RoutedEventArgs e)
+        {
+            LoadAppRules(Config.DefaultAppScreens());
+            SaveAppRules();
+        }
 
         // ---------------- Bichinhos: carinho ----------------
 
