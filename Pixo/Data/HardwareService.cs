@@ -38,6 +38,14 @@ namespace Pixo.Data
         private static Timer _timer;
         private static int _busy;
 
+        // O chip de sensores da placa-mãe (Super I/O) só é procurado quando a placa é aberta. Se nessa hora
+        // outro programa estiver mexendo nele (o MSI Center no logon, por exemplo), o LHM desiste e a placa
+        // fica sem sensor nenhum para sempre. Então, enquanto a placa vier vazia, ela é reaberta de tempos em tempos.
+        private static int _boardRetries;
+        private static DateTime _nextBoardRetry = DateTime.MinValue;
+        private const int MaxBoardRetries = 10;
+        private static string _boardNote = "";
+
         public static volatile HwSnapshot Current = HwSnapshot.Empty;
 
         private static readonly string[] CpuPreferred = { "CPU Package", "Core (Tctl/Tdie)", "Tctl/Tdie", "Core Average", "Core Max", "CPU Total" };
@@ -72,7 +80,9 @@ namespace Pixo.Data
                         IsMemoryEnabled = true
                     };
                     _computer.Open();
+                    _nextBoardRetry = DateTime.Now.AddSeconds(30);
                 }
+                RetryBoardIfEmpty();
 
                 var snap = new HwSnapshot();
                 HwComponent intelGpu = null;
@@ -163,6 +173,35 @@ namespace Pixo.Data
             }
         }
 
+        /// <summary>
+        /// Placa-mãe sem o chip de sensores (nenhum sub-hardware)? Reabre só a parte da placa: o LHM procura o
+        /// chip de novo. Primeira tentativa 30 s depois de abrir, depois a cada 1 min, até 10 vezes.
+        /// </summary>
+        private static void RetryBoardIfEmpty()
+        {
+            var board = _computer.Hardware.FirstOrDefault(h => h.HardwareType == HardwareType.Motherboard);
+            if (board == null) return;
+            if (board.SubHardware.Length > 0)
+            {
+                if (_boardRetries > 0 && !_boardNote.StartsWith("Chip"))
+                    _boardNote = $"Chip de sensores da placa encontrado na tentativa {_boardRetries}";
+                return;
+            }
+            if (_boardRetries >= MaxBoardRetries)
+            {
+                _boardNote = $"Chip de sensores da placa não encontrado (tentou {_boardRetries} vezes). " +
+                             "Algum programa (MSI Center, HWiNFO...) pode estar usando o chip.";
+                return;
+            }
+            if (DateTime.Now < _nextBoardRetry) return;
+
+            _boardRetries++;
+            _nextBoardRetry = DateTime.Now.AddMinutes(1);
+            _boardNote = $"Placa sem chip de sensores: tentando de novo ({_boardRetries} de {MaxBoardRetries})";
+            _computer.IsMotherboardEnabled = false;
+            _computer.IsMotherboardEnabled = true;
+        }
+
         // ---------------- diagnóstico ----------------
 
         private static DateTime _lastReport = DateTime.MinValue;
@@ -182,6 +221,7 @@ namespace Pixo.Data
                 sb.AppendLine("Administrador: " + new System.Security.Principal.WindowsPrincipal(
                     System.Security.Principal.WindowsIdentity.GetCurrent()).IsInRole(System.Security.Principal.WindowsBuiltInRole.Administrator));
                 sb.AppendLine("PawnIO instalado: " + PawnIoInstalled());
+                if (_boardNote.Length > 0) sb.AppendLine("Placa-mãe: " + _boardNote);
                 sb.AppendLine();
                 foreach (var hw in _computer.Hardware)
                 {
