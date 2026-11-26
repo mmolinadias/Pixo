@@ -200,8 +200,11 @@ namespace Pixo.Render
         /// <summary>A dupla numa imagem 360×216 que é reaproveitada (não guarde a referência entre quadros).</summary>
         public static WriteableBitmap PetsBitmap(string state, double pos, bool cushion = true, string from = null, double fromPos = 0, double mix = 1)
         {
-            _petsBuf ??= new uint[Pets.ScreenW * Pets.ScreenH];
-            _petsBmp ??= new WriteableBitmap(Pets.ScreenW, Pets.ScreenH, 96, 96, PixelFormats.Bgra32, null);
+            if (_petsBuf == null || _petsBuf.Length != Pets.ScreenW * Pets.ScreenH)
+            {
+                _petsBuf = new uint[Pets.ScreenW * Pets.ScreenH];
+                _petsBmp = new WriteableBitmap(Pets.ScreenW, Pets.ScreenH, 96, 96, PixelFormats.Bgra32, null);
+            }
             Pets.RenderDuoScreen(state, pos, from, fromPos, mix, _petsBuf, cushion);
             _petsBmp.WritePixels(new Int32Rect(0, 0, Pets.ScreenW, Pets.ScreenH), _petsBuf, Pets.ScreenW * 4, 0);
             return _petsBmp;

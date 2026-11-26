@@ -14,7 +14,18 @@ namespace Pixo.Render
     /// </summary>
     public static class Pets
     {
-        public const int Grid = 36, DuoW = 60, DuoH = 36, Scale = 6;
+        public const int Grid = 36, DuoW = 60, DuoH = 36;
+
+        /// <summary>Ampliação da arte na tela (6 = 360×216). Variável só para o laboratório comparar tamanhos.</summary>
+        public static int Scale = 6;
+
+        /// <summary>
+        /// Reações (susto e comemoração) mais contidas que no design: o pulo do corpo inteiro mudava quase todos
+        /// os pixels de uma vez, e a tela (que só recebe ~166 KB/s) levava ~0,3 s para pintar cada quadro: dava
+        /// para ver uma "linha" descendo. Testado na tela física, subindo de pouco em pouco: sem alargar de lado,
+        /// esticando 1/4 e com o pulo a 0,24 do design ainda não aparece linha (a 0,3 já aparece). (1 = como no design.)
+        /// </summary>
+        public static double ReactionJump = 0.24, ReactionSquashX = 0, ReactionSquashY = 0.25;
         private const int N = Grid, G = 31;
 
         // ---------------- estados (quadros, durações e textos) ----------------
@@ -116,14 +127,16 @@ namespace Pixo.Render
                     break;
                 case "susto":
                     double[] dys = { 0, -10, -16, -12, -4, 0, 0, 0, 0, 0 }, sys = { 0.9, 1.06, 1.05, 1.02, 1, 0.88, 1.04, 0.98, 1, 1 };
-                    p.Dy = Curve(dys, fp); p.Sy = Curve(sys, fp); p.Sx = 2 - p.Sy;
+                    p.Dy = Curve(dys, fp) * ReactionJump;
+                    p.Sy = 1 + (Curve(sys, fp) - 1) * ReactionSquashY; p.Sx = 1 + (1 - Curve(sys, fp)) * ReactionSquashX;
                     p.Eyes = f >= 1 && f <= 6 ? "wide" : (f == 0 ? "blink" : "open"); p.Mouth = f >= 1 && f <= 6 ? "o" : "smile";
                     p.Arms = f >= 1 && f <= 4 ? "up" : "down";
                     if (f >= 1 && f <= 7) p.Fx.Add(new object[] { "bang", 140.0, 40.0 + Math.Max(0, 6 - fp * 3) });
                     break;
                 case "comemora":
                     double[] dyc = { 0, -6, -16, -20, -14, -2, 0, -10, -16, -10, -2, 0 }, syc = { 0.9, 1.05, 1.06, 1.04, 1.02, 1, 0.9, 1.05, 1.04, 1.02, 0.94, 1 };
-                    p.Dy = Curve(dyc, fp); p.Sy = Curve(syc, fp); p.Sx = 2 - p.Sy;
+                    p.Dy = Curve(dyc, fp) * ReactionJump;
+                    p.Sy = 1 + (Curve(syc, fp) - 1) * ReactionSquashY; p.Sx = 1 + (1 - Curve(syc, fp)) * ReactionSquashX;
                     p.Eyes = "happy"; p.Mouth = "grin"; p.Arms = f == 0 || f == 6 || f == 11 ? "down" : "up";
                     p.Fx.Add(new object[] { "confetti", fp });
                     break;
@@ -526,7 +539,8 @@ namespace Pixo.Render
         };
 
         /// <summary>Tamanho da dupla na tela: 360×216 (a grade 60×36 ampliada 6×).</summary>
-        public const int ScreenW = DuoW * Scale, ScreenH = DuoH * Scale;
+        public static int ScreenW => DuoW * Scale;
+        public static int ScreenH => DuoH * Scale;
 
         /// <summary>
         /// De quantos em quantos pixels da tela o movimento anda em cada animação (1 = mais liso;
@@ -630,7 +644,7 @@ namespace Pixo.Render
         /// </summary>
         private static void DrawPetScreen(uint[] dst, Kind kind, Pose p, int f, double lean, bool mirror, char only, int offsetX, int step)
         {
-            const int S = Scale;
+            int S = Scale;
             int Q(double px) => Rnd(px / step) * step; // arredonda para o passo do movimento
             double tilt = p.Tilt + lean;
             if (mirror) tilt = -tilt;
@@ -644,7 +658,7 @@ namespace Pixo.Render
 
             // corpo: cada pixel da tela procura de qual bloco da arte ele vem
             // (desfaz o pulo, a inclinação e o esticar/achatar, nessa ordem)
-            const int midX = 18 * S, shearY = G * S;
+            int midX = 18 * S, shearY = G * S;
             // O design estica a altura em (Sy − 1)·30 blocos. Aqui o esticar acontece só na testa:
             // o alto da cabeça e as orelhas sobem/descem como um bloco e o rosto fica parado
             // (menos bordas mudam por quadro = menos USB; e os olhos não deformam).

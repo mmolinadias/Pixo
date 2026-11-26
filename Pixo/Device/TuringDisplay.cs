@@ -193,6 +193,8 @@ namespace Pixo.Device
             // 2) acha os pedaços que mudaram (retângulos justos: o USB cobra por pixel, não por comando)
             DirtyRects.Find(px, _hasPrev ? _prev : null, PanelW, PanelH, _rects);
             if (_rects.Count == 0) return 0; // nada mudou
+            // a tela se atualiza de cima para baixo (sem "rasgo" correndo de lado nos pulos)
+            if (DirtyRects.Sweep) DirtyRects.SweepTopDown(px, _hasPrev ? _prev : null, PanelW, _rects, topIsHighX: !flipped);
 
             // 3) envia bloco por bloco, do jeito que a tela aceita: primeiro o comando,
             //    depois os pixels daquele bloco (a tela reinicia se receber vários comandos colados)

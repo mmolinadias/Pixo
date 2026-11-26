@@ -93,5 +93,64 @@ namespace Pixo.Device
             }
             foreach (var o in _open) result.Add(new Rect(o.X0, o.Y0, o.X1, o.Y1));
         }
+
+        /// <summary>Mandar de cima para baixo (true) ou na ordem do painel, coluna por coluna (false, como antes).</summary>
+        public static bool Sweep = true;
+
+        /// <summary>Altura (em pixels da tela) das faixas em que o envio é dividido.</summary>
+        public static int SweepBand = 12;
+        private static readonly List<Rect> _bands = new List<Rect>();
+
+        /// <summary>
+        /// Reordena o envio para a tela se atualizar DE CIMA PARA BAIXO.
+        ///
+        /// O painel é "em pé" e a imagem é girada: dentro de um retângulo, ele se preenche coluna por coluna da
+        /// tela (da esquerda para a direita). Quando um quadro pesa muito (o pulo do susto e da comemoração leva
+        /// ~0,3 s para chegar), dava para ver um "rasgo" correndo pela tela: o Fred já no lugar novo e o Dengo
+        /// ainda pela metade. Em faixas horizontais finas, mandadas de cima para baixo, os dois atualizam juntos
+        /// e a passagem vira um esticar/achatar vertical, que combina com o pulo. Cada faixa é recortada só no
+        /// que mudou, então quase não custa bytes a mais.
+        /// </summary>
+        /// <param name="topIsHighX">true quando o topo da tela fica no x alto do painel (paisagem normal)</param>
+        public static void SweepTopDown(ushort[] cur, ushort[] prev, int w, List<Rect> rects, bool topIsHighX)
+        {
+            _bands.Clear();
+            int band = Math.Max(1, SweepBand);
+            foreach (var r in rects)
+            {
+                for (int bx0 = r.X0; bx0 <= r.X1; bx0 += band)
+                {
+                    int bx1 = Math.Min(r.X1, bx0 + band - 1);
+                    int x0 = bx0, x1 = bx1, y0 = r.Y0, y1 = r.Y1;
+                    if (prev != null)
+                    {
+                        // recorta a faixa no que mudou de verdade
+                        x0 = int.MaxValue; x1 = -1; y0 = -1;
+                        for (int y = r.Y0; y <= r.Y1; y++)
+                        {
+                            int row = y * w;
+                            for (int x = bx0; x <= bx1; x++)
+                            {
+                                if (cur[row + x] == prev[row + x]) continue;
+                                if (y0 < 0) y0 = y;
+                                y1 = y;
+                                if (x < x0) x0 = x;
+                                if (x > x1) x1 = x;
+                            }
+                        }
+                        if (y0 < 0) continue;
+                    }
+                    _bands.Add(new Rect(x0, y0, x1, y1));
+                }
+            }
+            // de cima para baixo na tela; na mesma altura, da esquerda para a direita
+            _bands.Sort((a, b) =>
+            {
+                int c = topIsHighX ? b.X1.CompareTo(a.X1) : a.X0.CompareTo(b.X0);
+                return c != 0 ? c : a.Y0.CompareTo(b.Y0);
+            });
+            rects.Clear();
+            rects.AddRange(_bands);
+        }
     }
 }
