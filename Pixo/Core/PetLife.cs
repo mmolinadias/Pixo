@@ -75,6 +75,20 @@ namespace Pixo.Core
             Spikes(now);
             GameEnd(now);
             Break(now);
+            ClaudeWait();
+        }
+
+        private DateTime _barkedFor = DateTime.MinValue;
+
+        /// <summary>O Claude pediu algo e você não respondeu em 2 minutos: o Fred late (uma vez por espera).</summary>
+        private void ClaudeWait()
+        {
+            var (wait, since) = ClaudeService.LongestWait();
+            if (wait == null || wait < TimeSpan.FromMinutes(2) || since == _barkedFor) return;
+            _barkedFor = since;
+            _pet.React("latido");
+            _pet.Say("CLAUDE", $"Au! O Claude tá esperando você há {(int)wait.Value.TotalMinutes} minutos.", 40);
+            _showPets();
         }
 
         /// <summary>Susto quando a CPU dispara de repente ou a temperatura sobe muito rápido.</summary>

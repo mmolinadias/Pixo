@@ -104,6 +104,10 @@ namespace Pixo.Core
         /// <summary>Depois de quanto tempo seguido no PC a dupla lembra de fazer uma pausa (0 = nunca).</summary>
         public double PetBreakMinutes { get => _petBreakMinutes; set => Set(ref _petBreakMinutes, Math.Clamp(Math.Round(value / 15) * 15, 0, 240)); }
 
+        private DateTime? _petBirthday;
+        /// <summary>Aniversário da dupla (dia em que o Pixo rodou pela primeira vez; dá para trocar na janela).</summary>
+        public DateTime? PetBirthday { get => _petBirthday; set => Set(ref _petBirthday, value?.Date); }
+
         // ---------------- Clima ----------------
         private string _weatherCity = "";
         /// <summary>Vazio = descobre a cidade pela internet. Senão, o nome da cidade (ex.: "Campinas").</summary>
@@ -252,6 +256,7 @@ namespace Pixo.Core
                 VoiceDefaultsVersion = 3;
             }
             AppScreens ??= DefaultAppScreens();
+            PetBirthday ??= DateTime.Today;
             if (string.IsNullOrEmpty(AcClientId)) AcClientId = "pixo-" + Guid.NewGuid().ToString("N");
         }
 

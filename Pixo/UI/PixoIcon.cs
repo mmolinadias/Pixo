@@ -59,6 +59,6 @@ namespace Pixo.UI
         }
 
         /// <summary>Um quadro do Fred & Dengo (360×216), igual ao da tela. A imagem é reaproveitada.</summary>
-        public static BitmapSource PetsFrame(string state, double pos) => D.PetsBitmap(state, pos);
+        public static BitmapSource PetsFrame(string state, double pos, PetScene scene = null) => D.PetsBitmap(state, pos, scene: scene);
     }
 }

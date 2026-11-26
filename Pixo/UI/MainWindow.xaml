@@ -316,6 +316,13 @@
                                 <ui:Button x:Name="PetShowButton" Content="Mostrar na tela" Margin="8,0,0,0" Click="OnPetShowOnScreen" IsEnabled="False"
                                            ToolTip="Toca esta animação na tela física por 30 segundos" />
                             </StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                                <TextBlock Text="Cena" Style="{StaticResource RowHint}" VerticalAlignment="Center" Width="40" />
+                                <ComboBox x:Name="PetSceneBox" Width="260" SelectionChanged="OnPetSceneChanged"
+                                          ToolTip="Roupa e enfeites do clima e das datas, e as visitas (passarinho, entrega, fantasma)" />
+                                <ui:Button x:Name="PetSceneButton" Content="Mostrar na tela" Margin="8,0,0,0" Click="OnPetSceneOnScreen" IsEnabled="False"
+                                           ToolTip="Mostra esta cena na tela física por 30 segundos" />
+                            </StackPanel>
                             <ui:CardControl Style="{StaticResource Row}">
                                 <ui:CardControl.Header>
                                     <StackPanel>
@@ -333,6 +340,15 @@
                                     </StackPanel>
                                 </ui:CardControl.Header>
                                 <TextBox Width="200" Text="{Binding PetName2, UpdateSourceTrigger=PropertyChanged}" MaxLength="12" />
+                            </ui:CardControl>
+                            <ui:CardControl Style="{StaticResource Row}">
+                                <ui:CardControl.Header>
+                                    <StackPanel>
+                                        <TextBlock Text="Aniversário da dupla" Style="{StaticResource RowTitle}" />
+                                        <TextBlock Text="Nesse dia eles usam chapéu de festa. Começa no dia em que o Pixo rodou pela primeira vez" Style="{StaticResource RowHint}" TextWrapping="Wrap" MaxWidth="420" />
+                                    </StackPanel>
+                                </ui:CardControl.Header>
+                                <DatePicker Width="200" SelectedDate="{Binding PetBirthday}" />
                             </ui:CardControl>
                             <ui:CardControl Style="{StaticResource Row}">
                                 <ui:CardControl.Header>

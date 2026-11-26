@@ -686,16 +686,46 @@ namespace Pixo.Render
             D.Icon(dc, "edit", 160, 236, 16, Pal.Ink3, 2);
             D.Text(dc, s.Files.Count == 1 ? "1 arquivo mexido" : s.Files.Count + " arquivos mexidos", 182, 234, 170, 20, 14, 700, Pal.Ink);
 
-            // ---- o que fez antes ----
-            var before = s.Recent.Where(a => !ReferenceEquals(a, s.Current)).Reverse().Take(2).ToList();
-            for (int i = 0; i < before.Count; i++)
+            // ---- o que fez antes (a última) ----
+            var before = s.Recent.LastOrDefault(a => !ReferenceEquals(a, s.Current));
+            if (before != null)
             {
-                double y = 266 + i * 22;
-                D.Icon(dc, before[i].Icon, 16, y + 2, 14, Pal.Ink3, 2);
-                D.Text(dc, before[i].Text, 38, y, 340, 18, 13, 600, Pal.Ink3);
-                D.Text(dc, Ago(before[i].At), 380, y, 88, 18, 12, 600, Pal.Ink3, Align.Right);
+                D.Icon(dc, before.Icon, 16, 260, 14, Pal.Ink3, 2);
+                D.Text(dc, before.Text, 38, 258, 340, 18, 13, 600, Pal.Ink3);
+                D.Text(dc, Ago(before.At), 380, 258, 88, 18, 12, 600, Pal.Ink3, Align.Right);
+            }
+
+            // ---- placar do dia ----
+            var day = ClaudeService.Today();
+            D.Card(dc, 12, 280, 456, 36);
+            D.Text(dc, "HOJE", 22, 280, 40, 36, 11, 700, Pal.Orange);
+            var cells = new (string num, string label, double x, double w)[]
+            {
+                (D.N0(day.Prompts), day.Prompts == 1 ? "pedido" : "pedidos", 64, 66),
+                (Duration(day.WorkSeconds), "trabalhando", 130, 88),
+                (D.N0(day.Tools), day.Tools == 1 ? "ação" : "ações", 218, 62),
+                (D.N0(day.Files.Count), day.Files.Count == 1 ? "arquivo" : "arquivos", 280, 72),
+                (Tokens(day.OutputTokens), "tokens escritos", 352, 108),
+            };
+            foreach (var c in cells)
+            {
+                D.Text(dc, c.num, c.x, 282, c.w, 18, 14, 700, Pal.Ink);
+                D.Text(dc, c.label, c.x, 299, c.w, 14, 10, 600, Pal.Ink3);
             }
         }
+
+        /// <summary>"35 min", "1h12".</summary>
+        public static string Duration(double seconds)
+        {
+            var t = TimeSpan.FromSeconds(Math.Max(0, seconds));
+            return t.TotalHours >= 1 ? $"{(int)t.TotalHours}h{t.Minutes:00}" : $"{(int)t.TotalMinutes} min";
+        }
+
+        /// <summary>"850", "23 mil", "1,2 mi".</summary>
+        public static string Tokens(long n) =>
+            n >= 1_000_000 ? (n / 1_000_000.0).ToString("0.#", D.PtBr) + " mi"
+            : n >= 1_000 ? D.N0(n / 1000.0) + " mil"
+            : D.N0(n);
     }
 
     // =====================================================================
@@ -775,6 +805,137 @@ namespace Pixo.Render
 
         public static bool IsNight(DateTime t) => t.Hour >= 23 || t.Hour < 6;
 
+        // ---------------- cena: clima, datas e visitas ----------------
+
+        private readonly PetScene _scene = new PetScene();
+        private readonly DateTime _t0 = DateTime.Now;
+
+        // visita pedida (vale 30 s; só começa quando a tela dos bichinhos aparece, como as reações)
+        private string _visitPending, _visit;
+        private DateTime _visitPendingUntil, _visitStart;
+        private bool _visitReacted;
+        private bool _ghost;
+
+        // teste: uma cena escolhida na janela toca na tela por um tempo
+        private string _sceneForced;
+        private DateTime _sceneForcedUntil;
+
+        /// <summary>Uma visita: "passarinho" (traz a notificação) ou "entrega" (download pronto). Ao pousar, a dupla reage.</summary>
+        public void Visit(string who)
+        {
+            _visitPending = who;
+            _visitPendingUntil = DateTime.Now.AddSeconds(30);
+        }
+
+        /// <summary>Visitas que podem ser testadas na janela.</summary>
+        public static readonly (string Id, string Name)[] SceneChoices =
+        {
+            ("chuva", "Chuva lá fora"), ("neve", "Neve lá fora"), ("sol", "Calor lá fora"), ("frio", "Frio (ou ar gelado)"),
+            ("natal", "Natal"), ("anonovo", "Ano Novo"), ("junina", "Festa junina"), ("halloween", "Dia das Bruxas"), ("aniversario", "Aniversário da dupla"),
+            ("passarinho", "Visita: passarinho (notificação)"), ("entrega", "Visita: entrega (download)"), ("fantasma", "Visita: fantasma (PC a 90°)"),
+        };
+
+        /// <summary>Mostra uma cena por alguns segundos (as visitas começam já).</summary>
+        public void PreviewScene(string kind, double seconds = 30)
+        {
+            if (kind == "passarinho" || kind == "entrega") { Visit(kind); return; }
+            _sceneForced = kind;
+            _sceneForcedUntil = DateTime.Now.AddSeconds(seconds);
+        }
+
+        /// <summary>Clima lá fora (e no quarto, pelo ar LG) do jeito que a dupla se veste.</summary>
+        public static string WeatherKind(WeatherInfo w, AcInfo ac)
+        {
+            if (w != null && w.Temp != null)
+            {
+                int c = w.Code;
+                if (c is >= 71 and <= 77 or 85 or 86) return "neve";
+                if (c is >= 51 and <= 67 or >= 80 and <= 82 or >= 95) return "chuva";
+                if (w.Temp >= 30 && w.IsDay) return "sol";
+            }
+            bool acCold = ac != null && ac.On && ac.Mode == "Frio" && (ac.Target ?? 99) <= 21;
+            if (acCold || w?.Temp <= 14) return "frio";
+            return null;
+        }
+
+        /// <summary>Data especial de hoje (ou null).</summary>
+        public static string PartyKind(DateTime d, DateTime? birthday)
+        {
+            if (birthday is DateTime b && d.Month == b.Month && d.Day == b.Day && d.Year > b.Year) return "aniversario";
+            if ((d.Month == 12 && d.Day == 31) || (d.Month == 1 && d.Day == 1)) return "anonovo";
+            if (d.Month == 12 && d.Day <= 26) return "natal";
+            if (d.Month == 6) return "junina";
+            if (d.Month == 10 && d.Day >= 29) return "halloween";
+            return null;
+        }
+
+        /// <summary>Cena para a prévia da janela: a de agora (kind = null) ou uma escolhida (as visitas repetem).</summary>
+        public static PetScene SceneFor(string kind, Config cfg, double time)
+        {
+            var sc = new PetScene { Time = time };
+            if (kind == null)
+            {
+                sc.Weather = WeatherKind(WeatherService.Current, AcService.Configured(cfg) ? AcService.Current : null);
+                sc.Party = PartyKind(DateTime.Now, cfg.PetBirthday);
+            }
+            else if (kind is "chuva" or "neve" or "sol" or "frio") sc.Weather = kind;
+            else if (kind is "passarinho" or "entrega")
+            {
+                sc.Visitor = kind;
+                sc.VisitT = time % (Pets.VisitLength(kind) + 1.5);
+            }
+            else if (kind == "fantasma") sc.Visitor = kind;
+            else sc.Party = kind;
+            return sc;
+        }
+
+        /// <summary>Atualiza a cena do quadro: clima, data, visita (e dispara a reação quando ela pousa).</summary>
+        private PetScene UpdateScene(Config cfg, DateTime now)
+        {
+            var sc = _scene;
+            sc.Time = (now - _t0).TotalSeconds;
+            sc.Weather = WeatherKind(WeatherService.Current, AcService.Configured(cfg) ? AcService.Current : null);
+            sc.Party = PartyKind(now, cfg.PetBirthday);
+
+            // fantasma: aparece com a CPU ou a GPU acima de 90° e só vai embora abaixo de 85°
+            var hw = HardwareService.Current;
+            double temp = new[] { hw.Cpu?.Temp, hw.Gpu?.Temp }.Where(t => t != null).Select(t => t.Value).DefaultIfEmpty(0).Max();
+            if (temp > 90) _ghost = true; else if (temp < 85) _ghost = false;
+
+            if (_visitPending != null)
+            {
+                if (now < _visitPendingUntil) { _visit = _visitPending; _visitStart = now; _visitReacted = false; }
+                _visitPending = null;
+            }
+            sc.Visitor = null; sc.VisitT = 0;
+            if (_visit != null)
+            {
+                double t = (now - _visitStart).TotalSeconds;
+                if (t >= Pets.VisitLength(_visit)) _visit = null;
+                else
+                {
+                    sc.Visitor = _visit; sc.VisitT = t;
+                    if (!_visitReacted && t >= Pets.VisitLandAt(_visit))
+                    {
+                        _visitReacted = true;
+                        React(_visit == "entrega" ? "comemora" : "susto");
+                    }
+                }
+            }
+
+            bool forcing = _sceneForced != null && now < _sceneForcedUntil;
+            if (!forcing) _sceneForced = null;
+            if (forcing)
+            {
+                var f = SceneFor(_sceneForced, cfg, sc.Time);
+                if (f.Weather != null) sc.Weather = f.Weather;
+                if (f.Party != null) sc.Party = f.Party;
+                if (f.Visitor == "fantasma") sc.Visitor = "fantasma";
+            }
+            else if (sc.Visitor == null && _ghost) sc.Visitor = "fantasma";
+            return sc;
+        }
+
         // teste: uma animação escolhida na janela (ou pela API) toca na tela por um tempo, ignorando o PC
         private string _forced;
         private DateTime _forcedUntil;
@@ -824,6 +985,7 @@ namespace Pixo.Render
             var cfg = _cfg();
             double temp = new[] { hw.Cpu?.Temp, hw.Gpu?.Temp }.Where(t => t != null).Select(t => t.Value).DefaultIfEmpty(0).Max();
             if (GameService.Current != null) return "jogando";
+            if (ClaudeService.LongestWait().wait != null) return "esperando"; // o Claude pediu algo e está esperando você
             if (temp > 80) return "quente";
             if (MediaService.Current?.Playing == true) return "musica";
             if (ClaudeService.AnyWorking) return "ocupado"; // ajudando o Claude Code
@@ -892,6 +1054,8 @@ namespace Pixo.Render
             var cfg = _cfg();
             var hw = HardwareService.Current;
             var info = Pets.States[_state];
+            var now = DateTime.Now;
+            var scene = UpdateScene(cfg, now);
 
             bool saying = _sayText != null && DateTime.Now < _sayUntil;
             bool needy = _state == "feliz" && cfg.PetMood < 30;
@@ -908,7 +1072,16 @@ namespace Pixo.Render
             // a dupla na almofada (360×216, pixel art 6×)
             double mix = _from == null ? 1 : (DateTime.Now - _changedAt).TotalMilliseconds / GlideMs;
             if (mix >= 1) _from = null;
-            D.PetsDuo(dc, _state, Position(), 60, 40, true, _from, _fromPos, Math.Min(1, mix));
+            D.PetsDuo(dc, _state, Position(), 60, 40, true, _from, _fromPos, Math.Min(1, mix), scene);
+
+            // o Claude espera você há mais de 2 minutos: faixas piscando em cima e embaixo
+            // (só faixas inteiras: linhas seguidas saem baratas no USB)
+            var (wait, _) = ClaudeService.LongestWait();
+            if (wait >= TimeSpan.FromMinutes(2) && (int)Math.Floor((now - _t0).TotalSeconds) % 2 == 0)
+            {
+                dc.DrawRectangle(Pal.Warn, null, new Rect(0, 0, 480, 4));
+                dc.DrawRectangle(Pal.Warn, null, new Rect(0, 316, 480, 4));
+            }
 
             // nomes embaixo de cada um
             D.Text(dc, cfg.PetName1, 112, 258, 100, 16, 13, 700, Pal.Ink, Align.Center);
@@ -916,11 +1089,13 @@ namespace Pixo.Render
 
             // frase da dupla (ou o recado do momento)
             string phrase = saying ? _sayText
+                : scene.Visitor == "fantasma" ? "Tá tão quente que apareceu até um fantasma!"
                 : needy ? string.Format("{0} e {1} tão com saudade de um carinho…", cfg.PetName1, cfg.PetName2)
-                : _state == "dormindo" && IsNight(DateTime.Now) && GameService.IdleSeconds() < cfg.PetSleepMinutes * 60
+                : _state == "dormindo" && IsNight(now) && GameService.IdleSeconds() < cfg.PetSleepMinutes * 60
                     ? "Já passou das 23h… a dupla foi dormir. E você?"
                 : _state == "ocupado" && ClaudeService.AnyWorking
                     ? string.Format("{0} e {1} tão ajudando o Claude a programar!", cfg.PetName1, cfg.PetName2)
+                : _state.StartsWith("feliz") && SceneLine(scene, cfg, now) is string line ? line
                 : string.Format(info.Phrase, cfg.PetName1, cfg.PetName2);
             D.Text(dc, phrase, 12, 278, 228, 32, 13, 600, saying ? Pal.Ink : Pal.Ink2, Align.Left, 2);
 
@@ -931,6 +1106,32 @@ namespace Pixo.Render
             D.SegBar(dc, 316, 280, 152, 10, 10, cpu, Pal.Accent);
             D.Text(dc, "Calor", 256, 294, 56, 16, 12, 600, Pal.Ink2);
             D.SegBar(dc, 316, 297, 152, 10, 10, temp, Pal.Temp(hw.Cpu?.Temp));
+        }
+
+        /// <summary>Frase da data especial ou do clima (quando a dupla está só de boa).</summary>
+        public static string SceneLine(PetScene sc, Config cfg, DateTime now)
+        {
+            string a = cfg.PetName1, b = cfg.PetName2;
+            switch (sc.Party)
+            {
+                case "natal": return now.Day >= 24 && now.Day <= 25 ? "Feliz Natal! A dupla tá de gorrinho." : $"Clima de Natal! {a} e {b} de gorrinho.";
+                case "anonovo": return now.Month == 12 ? "Hoje tem fogos! Feliz Ano Novo!" : "Feliz Ano Novo! Que venha um ano de boa.";
+                case "junina": return "Arraiá da dupla! Chapéu de palha e bandeirinha.";
+                case "halloween": return "Dia das Bruxas! Cuidado com a abóbora.";
+                case "aniversario":
+                {
+                    int years = now.Year - (cfg.PetBirthday ?? now).Year;
+                    return $"Hoje a dupla faz {years} {(years == 1 ? "ano" : "anos")}! Parabéns, {a} e {b}!";
+                }
+            }
+            return sc.Weather switch
+            {
+                "chuva" => $"Chovendo lá fora… o {b} trouxe o guarda-chuva.",
+                "neve" => "Nevando lá fora?! Cachecol na dupla.",
+                "sol" => "Calorão lá fora! Óculos escuros na dupla.",
+                "frio" => "Friozinho! Cachecol na dupla.",
+                _ => null,
+            };
         }
 
         // coração em pixel art (7×6 pixels de 2 px)

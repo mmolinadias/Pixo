@@ -5,6 +5,24 @@ using System.Linq;
 namespace Pixo.Render
 {
     /// <summary>
+    /// O que está em volta da dupla, fora do humor deles: a roupa e os enfeites do clima e da data,
+    /// e as visitas. Tudo em blocos inteiros (6 px), para mexer pouco no USB.
+    /// </summary>
+    public class PetScene
+    {
+        /// <summary>null, "chuva", "neve", "sol" (calor) ou "frio".</summary>
+        public string Weather;
+        /// <summary>null, "natal", "anonovo", "junina", "halloween" ou "aniversario".</summary>
+        public string Party;
+        /// <summary>null, "passarinho" (notificação), "entrega" (download pronto) ou "fantasma" (PC muito quente).</summary>
+        public string Visitor;
+        /// <summary>Segundos desde que a visita começou.</summary>
+        public double VisitT;
+        /// <summary>Relógio da cena em segundos (chuva, fogos, luzinhas, fantasma).</summary>
+        public double Time;
+    }
+
+    /// <summary>
     /// Fred (cachorro) e Dengo (gato) em pixel art — tradução do sistema de design Pixo.
     /// Cada bichinho é desenhado numa grade 36×36 (a dupla ocupa 60×36: Fred em x−1, Dengo em x+23),
     /// sobre uma almofada, e aparece ampliado 6× (360×216). A arte fica sempre em blocos de 6 px;
@@ -48,6 +66,8 @@ namespace Pixo.Render
             ["musica"] = new StateInfo { Name = "Ouvindo música", Loop = true, Chip = "DANÇANDO", Phrase = "Dancinha da dupla!", Durations = new[] { 125, 125, 125, 125, 125, 125, 125, 125 } },
             ["susto"] = new StateInfo { Name = "Notificação (reação)", Loop = false, Chip = "SURPRESOS", Phrase = "Opa! Chegou notificação!", Durations = new[] { 125, 125, 125, 125, 125, 125, 125, 125, 125, 250 } },
             ["comemora"] = new StateInfo { Name = "Download concluído (reação)", Loop = false, Chip = "COMEMORANDO", Phrase = "Download pronto! Festa!", Durations = new[] { 125, 125, 125, 125, 125, 125, 125, 125, 125, 125, 125, 250 } },
+            ["esperando"] = new StateInfo { Name = "Esperando você (Claude)", Loop = true, Chip = "TE ESPERANDO", Phrase = "{0} tá esperando você responder o Claude!", Durations = new[] { 100, 100, 100, 100, 100, 100, 100, 100 } },
+            ["latido"] = new StateInfo { Name = "Latido (Claude esperando)", Loop = false, Chip = "AU AU!", Phrase = "Au! O Claude tá esperando você faz tempo!", Durations = new[] { 125, 125, 125, 125, 125, 125, 125, 125, 125, 250 } },
         };
 
         // ---------------- pose (igual à do design) ----------------
@@ -140,6 +160,25 @@ namespace Pixo.Render
                     p.Eyes = "happy"; p.Mouth = "grin"; p.Arms = f == 0 || f == 6 || f == 11 ? "down" : "up";
                     p.Fx.Add(new object[] { "confetti", fp });
                     break;
+                case "esperando":
+                {
+                    // de frente para você, rabo abanando (troca a cada 100 ms) e um pulinho bem leve
+                    // (um pulinho por volta: mais que isso o corpo inteiro muda a cada quadro e não cabe no USB)
+                    double hop = Math.Abs(Math.Sin(fp / n * Math.PI * 2));
+                    p.Dy = -3 * hop;
+                    p.Eyes = f == 3 ? "blink" : "open"; p.Mouth = f % 4 < 2 ? "grin" : "smile";
+                    break;
+                }
+                case "latido":
+                {
+                    // dois "AU!" com pulinhos do tamanho dos das reações (que já não mostram linha na tela)
+                    double[] dyl = { 0, -6, 0, -1, 0, -6, 0, -1, 0, 0 };
+                    p.Dy = Curve(dyl, fp) * 0.8;
+                    p.Mouth = f == 1 || f == 2 || f == 5 || f == 6 ? "o" : "smile";
+                    p.Eyes = f == 1 || f == 5 ? "happy" : "open";
+                    if (f >= 1 && f <= 8) p.Fx.Add(new object[] { "bark" });
+                    break;
+                }
             }
             return p;
         }
@@ -235,12 +274,12 @@ namespace Pixo.Render
         /// (isso é aplicado depois, pixel a pixel, em DrawPetScreen). Devolve o personagem
         /// (com contorno) e a lista de efeitos.
         /// </summary>
-        private static (uint[] chr, List<FxStamp> fx) DrawPet(Kind K, Pose p, int f, char only)
+        private static (uint[] chr, List<FxStamp> fx) DrawPet(Kind K, Pose p, int f, char only, Dress dress = default)
         {
-            // efeitos de cada um: o Fred não tem "Zzz" nem a nota dupla; o Dengo não tem a nota simples
+            // efeitos de cada um: o Fred não tem "Zzz" nem a nota dupla; o Dengo não tem a nota simples nem late
             var fxList = only == 'a'
                 ? p.Fx.Where(e => !((string)e[0] == "note" && (bool)e[4]) && (string)e[0] != "z").ToList()
-                : p.Fx.Where(e => !((string)e[0] == "note" && !(bool)e[4])).ToList();
+                : p.Fx.Where(e => !((string)e[0] == "note" && !(bool)e[4]) && (string)e[0] != "bark").ToList();
 
             uint body = K.Body, shade = K.Shade, light = K.Light, line = K.Line; // a dupla mantém as cores no calor
             var chr = new uint[N * N];
@@ -296,6 +335,24 @@ namespace Pixo.Render
                 _ => null
             };
             if (arms != null) foreach (var a in arms) Stamp(chr, a.Item3, a.Item1, a.Item2, M(('s', armC)), true);
+
+            // guarda-chuva do Dengo (atrás do corpo: o cabo some atrás da cabeça)
+            if (dress.Umbrella && only == 'b')
+            {
+                Stamp(chr, new[]
+                {
+                    "......uuuu......",
+                    "...uuuuuuuuuu...",
+                    ".uuuuuuuuuuuuuu.",
+                    "uvvuuvvuuvvuuvvu",
+                    "........k.......",
+                    "........k.......",
+                    "........k.......",
+                    "........k.......",
+                    "........k.......",
+                    "........k.......",
+                }, 13, top - 11, M(('u', C("#a569ff")), ('v', C("#7c4ad9")), ('k', C("#4a3484"))), true);
+            }
 
             // pés
             uint pc = K.Paw != 0 && !p.Hot ? K.Paw : shade;
@@ -457,6 +514,44 @@ namespace Pixo.Render
                     }
             }
 
+            // roupa do dia (clima e datas): carimbada na arte, então pula e estica junto com o corpo
+            bool cat = only == 'b';
+            if (dress.Scarf)
+            {
+                uint s1 = C("#e2434b"), s2 = C("#f7f7f7"), s3 = C("#b02a35");
+                for (int ys = 26; ys <= 27; ys++)
+                    for (int xs = 0; xs < N; xs++)
+                        if (Inside(xs, ys)) Cs(xs, ys, ys == 27 ? s3 : ((xs / 2) % 2 == 0 ? s1 : s2));
+                Stamp(chr, new[] { "aa", "ba", "ab" }, 24, 28, M(('a', s1), ('b', s3)), true);
+            }
+            if (dress.Shades)
+            {
+                // no Dengo (preto) a armação é rosa, senão os óculos somem na cara dele
+                Stamp(chr, new[] { "ffffffffffffff", ".kgkk....kgkk.", ".kkkk....kkkk." }, 11, ey,
+                    M(('f', C(cat ? "#ff699c" : "#101418")), ('k', C("#101418")), ('g', C("#5b6b80"))), true);
+            }
+            string hat = dress.Hat == "chuva" && cat ? null : dress.Hat; // na chuva o Dengo vai de guarda-chuva
+            if (hat != null)
+            {
+                var (map, hx, hy, cm) = hat switch
+                {
+                    "natal" => (cat
+                        ? new[] { "......ww", ".....rww", "....rr..", "...drr..", "..ddrr..", ".ddrrrr.", "wwwwwwww", "gggggggg" }
+                        : new[] { "..........ww", "........rrww", ".......rrr..", "......drrr..", "....ddrrrr..", "..ddrrrrrr..", "wwwwwwwwwwww", "gggggggggggg" },
+                        cat ? 14 : 12, top - 7,
+                        M(('r', C("#e2434b")), ('d', C("#b02a35")), ('w', C("#f7f7f7")), ('g', C("#d9dde3")))),
+                    "festa" => (new[] { "...yy...", "...pp...", "..pccp..", "..pppp..", ".ppccpp.", ".pppppp.", "ppccccpp" },
+                        14, top - 6, M(('p', C("#ff699c")), ('c', C("#42cfef")), ('y', C("#ffc739")))),
+                    "palha" => (cat
+                        ? new[] { "..hhhhhh..", "..rrrrrr..", "hhhhhhhhhh", ".dddddddd." }
+                        : new[] { "....hhhhhhhh....", "....rrrrrrrr....", "dhhhhhhhhhhhhhhd", ".dddddddddddddd." },
+                        cat ? 13 : 10, top - 4, M(('h', C("#e8c26a")), ('d', C("#c49a45")), ('r', C("#e2434b")))),
+                    _ => (new[] { "...yyyyyyyy...", "..yyyyyyyyyy..", "dddddddddddddd" }, // chapéu de chuva do Fred
+                        11, top - 3, M(('y', C("#ffc739")), ('d', C("#e0a020")))),
+                };
+                Stamp(chr, map, hx, hy, cm, true);
+            }
+
             // contorno de 1 pixel
             var outBuf = (uint[])chr.Clone();
             for (int y2 = 0; y2 < N; y2++)
@@ -508,6 +603,10 @@ namespace Pixo.Render
                     case "bang":
                         Fx(new[] { "yy", "yy", "yy", "yy", "..", "yy" }, X((double)e[1]) - 1, X((double)e[2]) - 3, M(('y', C("#ffc739"))));
                         break;
+                    case "bark":
+                        // balão "AU!" acima e à direita da cabeça do Fred
+                        Fx(BarkBubble, 21, 0, M(('w', WHITE), ('k', EYE), ('o', C("#4a4238"))));
+                        break;
                     case "confetti":
                         {
                             double ev = (double)e[1];
@@ -531,11 +630,58 @@ namespace Pixo.Render
             return (outBuf, fx);
         }
 
+        // ---------------- balão de fala (fonte 3×5) ----------------
+
+        private static readonly Dictionary<char, string[]> Glyphs = new Dictionary<char, string[]>
+        {
+            ['A'] = new[] { ".k.", "k.k", "kkk", "k.k", "k.k" },
+            ['U'] = new[] { "k.k", "k.k", "k.k", "k.k", "kkk" },
+            ['!'] = new[] { "k", "k", "k", ".", "k" },
+            [' '] = new[] { ".", ".", ".", ".", "." },
+        };
+
+        private static readonly string[] BarkBubble = Bubble("AU!");
+
+        /// <summary>Balão branco com contorno ('o'), o texto em 'k' e a pontinha embaixo à esquerda.</summary>
+        private static string[] Bubble(string text)
+        {
+            var rows = new System.Text.StringBuilder[5];
+            for (int r = 0; r < 5; r++) rows[r] = new System.Text.StringBuilder();
+            for (int i = 0; i < text.Length; i++)
+            {
+                var g = Glyphs[text[i]];
+                for (int r = 0; r < 5; r++) rows[r].Append(i > 0 ? "." : "").Append(g[r]);
+            }
+            int w = rows[0].Length + 2;
+            var inner = new List<string> { "." + new string('w', w - 2) + "." };
+            foreach (var r in rows) inner.Add("w" + r.ToString().Replace('.', 'w') + "w");
+            inner.Add("." + new string('w', w - 2) + ".");
+            inner.Add(".ww" + new string('.', w - 3));
+            inner.Add(".w" + new string('.', w - 2));
+            // contorno de 1 bloco em volta de tudo que não é vazio
+            int H = inner.Count, W = w + 2;
+            char At(int x, int y) => x < 1 || y < 1 || x > w || y > H ? '.' : inner[y - 1][x - 1];
+            var res = new string[H + 2];
+            for (int y = 0; y < H + 2; y++)
+            {
+                var sb = new System.Text.StringBuilder(W);
+                for (int x = 0; x < W; x++)
+                {
+                    char c = At(x, y);
+                    if (c == '.' && (At(x - 1, y) != '.' || At(x + 1, y) != '.' || At(x, y - 1) != '.' || At(x, y + 1) != '.')) c = 'o';
+                    sb.Append(c);
+                }
+                res[y] = sb.ToString();
+            }
+            return res;
+        }
+
         // ---------------- a dupla ----------------
 
         private static readonly Dictionary<string, int> Phase = new Dictionary<string, int>
         {
-            ["feliz"] = 6, ["ocupado"] = 3, ["quente"] = 2, ["dormindo"] = 6, ["jogando"] = 4, ["musica"] = 0, ["susto"] = 1, ["comemora"] = 3
+            ["feliz"] = 6, ["ocupado"] = 3, ["quente"] = 2, ["dormindo"] = 6, ["jogando"] = 4, ["musica"] = 0, ["susto"] = 1, ["comemora"] = 3,
+            ["esperando"] = 3, ["latido"] = 0
         };
 
         /// <summary>Tamanho da dupla na tela: 360×216 (a grade 60×36 ampliada 6×).</summary>
@@ -552,6 +698,7 @@ namespace Pixo.Render
         {
             // movimentos lentos: passo pequeno (liso e barato)
             ["feliz"] = 1, ["feliz_coracao"] = 1, ["susto"] = 1, ["comemora"] = 1, ["dormindo"] = 2, ["jogando"] = 3,
+            ["esperando"] = 1, ["latido"] = 1,
             // movimentos rápidos andam 5–7 px por quadro de qualquer jeito; em blocos inteiros custam
             // metade e sobra banda para mais quadros por segundo
             ["ocupado"] = 6, ["quente"] = 6, ["musica"] = 6,
@@ -579,18 +726,22 @@ namespace Pixo.Render
         /// andam de 1 em 1 pixel: o movimento fica fluido e cada quadro muda pouca coisa no USB.
         /// "pos" pode ter fração (3,4 = 40% do caminho da pose 3 à 4).
         /// </summary>
-        public static void RenderDuoScreen(string state, double pos, uint[] dst, bool cushion = true)
-            => RenderDuoScreen(state, pos, null, 0, 1, dst, cushion);
+        public static void RenderDuoScreen(string state, double pos, uint[] dst, bool cushion = true, PetScene scene = null)
+            => RenderDuoScreen(state, pos, null, 0, 1, dst, cushion, scene);
 
         /// <summary>
         /// Igual, mas vindo de outro estado ("from", na posição fromPos): mix = 0 é o movimento do
         /// estado antigo, 1 é o do novo. Assim a troca de estado não dá tranco.
+        /// "scene" (opcional) é o que está em volta: roupa do clima/da data, chuva, enfeites e visitas.
         /// </summary>
-        public static void RenderDuoScreen(string state, double pos, string from, double fromPos, double mix, uint[] dst, bool cushion = true)
+        public static void RenderDuoScreen(string state, double pos, string from, double fromPos, double mix, uint[] dst, bool cushion = true, PetScene scene = null)
         {
             if (!States.ContainsKey(state)) state = "feliz";
             if (from != null && !States.ContainsKey(from)) from = null;
             Array.Clear(dst, 0, ScreenW * ScreenH);
+
+            // atrás de tudo: bandeirinhas, fogos, chuva/neve
+            if (scene != null) SceneBack(dst, scene);
 
             if (cushion)
             {
@@ -599,10 +750,21 @@ namespace Pixo.Render
                     (31, 6, 53, "#3b4354"), (32, 4, 55, "#2b3140"), (33, 3, 56, "#2b3140"), (34, 3, 56, "#232834"), (35, 5, 54, "#1b1f28")
                 };
                 foreach (var r in rows) FillPx(dst, r.x0 * Scale, r.y * Scale, (r.x1 - r.x0 + 1) * Scale, Scale, C(r.c));
-                foreach (var x in new[] { 10, 17, 24, 31, 38, 45, 52 }) FillPx(dst, x * Scale, 31 * Scale, Scale, Scale, C("#4a5468"));
+                // no Natal os pontinhos da almofada viram luzinhas que piscam (troca a cada 0,5 s)
+                string[] lights = { "#ff595a", "#39db84", "#ffc739", "#42cfef" };
+                int blink = scene == null ? 0 : (int)Math.Floor(scene.Time * 2);
+                int[] dots = { 10, 17, 24, 31, 38, 45, 52 };
+                for (int i = 0; i < dots.Length; i++)
+                    FillPx(dst, dots[i] * Scale, 31 * Scale, Scale, Scale,
+                        scene?.Party == "natal" ? C(lights[(i + blink) % lights.Length]) : C("#4a5468"));
             }
 
             var (poseA, fA, poseB, fB) = Poses(state, pos);
+            // de olho na visita (passarinho ou entrega), depois que ela pousa no meio da almofada
+            if (scene != null && state != "dormindo" && VisitLanded(scene))
+            {
+                poseA.Look = 4; poseB.Look = -4;
+            }
             if (from != null && mix < 1)
             {
                 // troca de estado: o corpo desliza da pose antiga para a nova
@@ -615,8 +777,12 @@ namespace Pixo.Render
             }
             double[] lean = state == "dormindo" ? new[] { 0.06, -0.06 } : new[] { 0.0, 0.0 };
             int step = StepFor(state);
-            DrawPetScreen(dst, Fred, poseA, fA, lean[0], false, 'a', -1, step);
-            DrawPetScreen(dst, Dengo, poseB, fB, lean[1], state == "musica", 'b', 23, step);
+            var dress = DressFor(scene, state);
+            DrawPetScreen(dst, Fred, poseA, fA, lean[0], false, 'a', -1, step, dress);
+            DrawPetScreen(dst, Dengo, poseB, fB, lean[1], state == "musica", 'b', 23, step, dress);
+
+            // na frente: visitas e a abóbora
+            if (scene != null) SceneFront(dst, scene);
         }
 
         /// <summary>Poses do Fred e do Dengo (o Dengo anda um pouco defasado, como no design).</summary>
@@ -626,8 +792,198 @@ namespace Pixo.Render
             int n = info.Durations.Length;
             int ph = Phase.TryGetValue(state, out var v) ? v : 0;
             double posB = info.Loop ? ((pos + ph) % n + n) % n : Math.Max(0, pos - ph);
-            return (MakePose(state, pos), (int)Math.Floor(pos), MakePose(state, posB), (int)Math.Floor(posB));
+            var a = MakePose(state, pos);
+            var b = MakePose(state, posB);
+            int fb = (int)Math.Floor(posB);
+            if (state == "esperando")
+            {
+                // quem espera é o Fred; o Dengo fica parado, de olho nele
+                b.Dy = 0; b.Sy = 1; b.Mouth = "smile"; b.Look = -4;
+                b.Eyes = fb == 6 ? "blink" : "open";
+            }
+            else if (state == "latido")
+            {
+                // o Dengo não late: só aperta os olhos com o barulho
+                int fa = (int)Math.Floor(pos);
+                b = new Pose { Eyes = fa >= 1 && fa <= 7 ? "half" : "open", Mouth = "flat", Look = -4 };
+            }
+            return (a, (int)Math.Floor(pos), b, fb);
         }
+
+        // ---------------- roupa e cena ----------------
+
+        private struct Dress { public string Hat; public bool Shades, Scarf, Umbrella; }
+
+        /// <summary>Roupa do dia: chapéu da data (ou de chuva), óculos no calor, cachecol no frio, guarda-chuva na chuva.</summary>
+        private static Dress DressFor(PetScene sc, string state)
+        {
+            var d = new Dress();
+            if (sc == null) return d;
+            bool sleeping = state == "dormindo";
+            d.Hat = sc.Party switch
+            {
+                "natal" => "natal",
+                "anonovo" or "aniversario" => "festa",
+                "junina" => "palha",
+                _ => sc.Weather == "chuva" ? "chuva" : null,
+            };
+            d.Shades = sc.Weather == "sol" && !sleeping;
+            d.Scarf = sc.Weather == "frio" || sc.Weather == "neve";
+            d.Umbrella = sc.Weather == "chuva" && !sleeping && d.Hat == "chuva"; // com chapéu de festa, o cabo atravessaria o chapéu
+            return d;
+        }
+
+        /// <summary>Número "aleatório" fixo (0–1) para cada gota, faísca etc.</summary>
+        private static double Hash(int i, int salt)
+        {
+            double v = Math.Sin(i * 12.9898 + salt * 78.233) * 43758.5453;
+            return v - Math.Floor(v);
+        }
+
+        /// <summary>Um mapa em blocos inteiros da grade da dupla (60×36): parado no lugar, custa pouco no USB.</summary>
+        private static void Blocks(uint[] dst, string[] map, double gx, double gy, Func<char, uint> cm)
+        {
+            int bx = Rnd(gx) * Scale, by = Rnd(gy) * Scale;
+            for (int j = 0; j < map.Length; j++)
+                for (int i = 0; i < map[j].Length; i++)
+                {
+                    uint c = cm(map[j][i]);
+                    if (c != 0) FillPx(dst, bx + i * Scale, by + j * Scale, Scale, Scale, c);
+                }
+        }
+
+        private static Func<char, uint> Cm(params (char k, string hex)[] pairs)
+        {
+            var cols = pairs.Select(p => (p.k, c: C(p.hex))).ToArray();
+            return ch => { foreach (var (k, c) in cols) if (k == ch) return c; return 0; };
+        }
+
+        private static void SceneBack(uint[] dst, PetScene sc)
+        {
+            int S = Scale;
+            // festa junina: bandeirinhas fixas no alto
+            if (sc.Party == "junina")
+            {
+                string[] flags = { "#ff595a", "#ffc739", "#39db84", "#42cfef", "#ff699c", "#a569ff" };
+                for (int x = 1; x < DuoW - 1; x++) FillPx(dst, x * S, 1 * S, S, S, C("#9ca6b5"));
+                for (int i = 0; i < 14; i++)
+                {
+                    uint c = C(flags[i % flags.Length]);
+                    int x = 2 + i * 4;
+                    FillPx(dst, x * S, 2 * S, 3 * S, S, c);
+                    FillPx(dst, (x + 1) * S, 3 * S, S, S, c);
+                }
+            }
+            // Ano Novo: fogos nos cantos de cima (8 faíscas que abrem e somem)
+            if (sc.Party == "anonovo")
+            {
+                var bursts = new (double x, double y, string c, double off)[] { (8, 7, "#ffc739", 0), (52, 6, "#ff699c", 1.2), (30, 3, "#42cfef", 0.6) };
+                foreach (var b in bursts)
+                {
+                    double t = (sc.Time + b.off) % 2.4;
+                    if (t > 1.1) continue;
+                    double r = 1 + t * 4.5;
+                    uint c = C(t > 0.8 ? "#9ca6b5" : b.c);
+                    for (int k = 0; k < 8; k++)
+                    {
+                        double ang = k * Math.PI / 4;
+                        int px = Rnd(b.x + Math.Cos(ang) * r), py = Rnd(b.y + Math.Sin(ang) * r * 0.8);
+                        if (py >= 0 && py < 30) FillPx(dst, px * S, py * S, S, S, c);
+                    }
+                    FillPx(dst, Rnd(b.x) * S, Rnd(b.y) * S, S, S, c);
+                }
+            }
+            // chuva (gotas de 1×2 blocos) ou neve (flocos de 1 bloco, mais lentos e balançando)
+            if (sc.Weather == "chuva" || sc.Weather == "neve")
+            {
+                bool rain = sc.Weather == "chuva";
+                uint c = C(rain ? "#5aa9e6" : "#e8f1ff");
+                int count = rain ? 10 : 12;
+                for (int i = 0; i < count; i++)
+                {
+                    double speed = rain ? 13 + Hash(i, 2) * 4 : 3 + Hash(i, 2) * 2;
+                    int x = 1 + (int)Math.Floor(Hash(i, 1) * 58);
+                    if (!rain) x += (int)Math.Floor(sc.Time * 1.2 + i) % 2;
+                    int y = (int)Math.Floor((sc.Time * speed + Hash(i, 3) * 40) % 40) - 6;
+                    for (int k = 0; k < (rain ? 2 : 1); k++)
+                        if (y + k >= 0 && y + k < 31) FillPx(dst, x * S, (y + k) * S, S, S, c);
+                }
+            }
+        }
+
+        private static void SceneFront(uint[] dst, PetScene sc)
+        {
+            // Dia das Bruxas: abóbora na ponta direita da almofada
+            if (sc.Party == "halloween")
+                Blocks(dst, new[] { "..g..", ".ooo.", "okoko", "ookoo", ".ooo." }, 54, 27, Cm(('g', "#39db84"), ('o', "#ff8a3d"), ('k', "#101418")));
+
+            double t = sc.VisitT;
+            switch (sc.Visitor)
+            {
+                case "fantasma":
+                {
+                    // flutua no canto de cima, subindo e descendo devagar
+                    int bob = (int)Math.Floor(sc.Time / 0.6) % 2;
+                    bool tail = (int)Math.Floor(sc.Time / 0.3) % 2 == 0;
+                    Blocks(dst, new[] { ".wwww.", "wwwwww", "wkwwkw", "wwwwww", "wwkkww", "wwwwww", tail ? "w.ww.w" : ".ww.ww" }, 1, 3 + bob,
+                        Cm(('w', "#e8ecf2"), ('k', "#101418")));
+                    break;
+                }
+                case "passarinho":
+                {
+                    string[] sit = { ".yy....", "okyyyyt", ".yywwy.", "..f.f.." };
+                    string[] flyA = { "...ww..", ".yyww..", "okyyyyt", ".yyyy.." };
+                    string[] flyB = { ".yy....", "okyyyyt", ".yyww..", "...ww.." };
+                    var cm = Cm(('y', "#ffc739"), ('o', "#ff8a3d"), ('k', "#101418"), ('t', "#e0a020"), ('w', "#e0a020"), ('f', "#ff8a3d"));
+                    const double land = BirdIn, stay = BirdStay, leave = BirdOut;
+                    bool flap = (int)Math.Floor(t / 0.12) % 2 == 0;
+                    if (t < land)
+                    {
+                        double u = t / land, e = 1 - (1 - u) * (1 - u);
+                        Blocks(dst, flap ? flyA : flyB, 62 + (26 - 62) * e, 4 + (27 - 4) * e, cm);
+                    }
+                    else if (t < land + stay)
+                    {
+                        // pulinho de 1 bloco a cada 1,6 s
+                        bool hop = (t - land) % 1.6 > 1.4;
+                        Blocks(dst, sit, 26, hop ? 26 : 27, cm);
+                    }
+                    else if (t < land + stay + leave)
+                    {
+                        double u = (t - land - stay) / leave, e = u * u;
+                        Blocks(dst, flap ? flyA : flyB, 26 + (-9 - 26) * e, 27 + (-6 - 27) * e, cm);
+                    }
+                    break;
+                }
+                case "entrega":
+                {
+                    var cm = Cm(('p', "#ff699c"), ('w', "#f7f7f7"), ('s', "#9ca6b5"), ('c', "#d9a066"), ('b', "#b07a45"), ('r', "#ff699c"));
+                    if (t < DropIn)
+                    {
+                        // caixa de paraquedas descendo e balançando um pouco
+                        double y = -9 + (23 + 9) * (t / DropIn);
+                        int sway = Rnd(Math.Sin(t * 3));
+                        Blocks(dst, new[] { ".pwpwp.", "ppppppp", "s.....s", ".s...s.", ".ccrcc.", ".bbrbb.", ".bbrbb.", ".bbrbb." }, 26 + sway, y, cm);
+                    }
+                    else if (t < DropIn + DropStay)
+                        Blocks(dst, new[] { "ccrcc", "bbrbb", "bbrbb", "bbrbb" }, 27, 27, cm);
+                    break;
+                }
+            }
+        }
+
+        // tempos das visitas (s): chegada, quanto ficam, saída
+        public const double BirdIn = 1.2, BirdStay = 6, BirdOut = 1.2, DropIn = 2.0, DropStay = 6;
+
+        /// <summary>Quando a visita pousa (e a dupla reage).</summary>
+        public static double VisitLandAt(string visitor) => visitor == "entrega" ? DropIn : BirdIn;
+
+        /// <summary>Quanto dura a visita inteira.</summary>
+        public static double VisitLength(string visitor) => visitor == "entrega" ? DropIn + DropStay : BirdIn + BirdStay + BirdOut;
+
+        private static bool VisitLanded(PetScene sc) =>
+            (sc.Visitor == "passarinho" || sc.Visitor == "entrega") &&
+            sc.VisitT >= VisitLandAt(sc.Visitor) && sc.VisitT < VisitLength(sc.Visitor) - (sc.Visitor == "passarinho" ? BirdOut : 0);
 
         /// <summary>Leva as medidas do corpo de "p" na direção de "old" (t = 0: igual a old; t = 1: igual a p).</summary>
         private static void Glide(Pose p, Pose old, double t)
@@ -642,13 +998,13 @@ namespace Pixo.Render
         /// Um bichinho na tela: sombra, corpo (com pulo, esticar/achatar e inclinação aplicados
         /// pixel a pixel) e efeitos. offsetX em blocos da grade da dupla.
         /// </summary>
-        private static void DrawPetScreen(uint[] dst, Kind kind, Pose p, int f, double lean, bool mirror, char only, int offsetX, int step)
+        private static void DrawPetScreen(uint[] dst, Kind kind, Pose p, int f, double lean, bool mirror, char only, int offsetX, int step, Dress dress)
         {
             int S = Scale;
             int Q(double px) => Rnd(px / step) * step; // arredonda para o passo do movimento
             double tilt = p.Tilt + lean;
             if (mirror) tilt = -tilt;
-            var (chr, fx) = DrawPet(kind, p, f, only);
+            var (chr, fx) = DrawPet(kind, p, f, only, dress);
             int ox = offsetX * S;
 
             // sombra no chão (preto com 38% de opacidade); encolhe quando eles pulam

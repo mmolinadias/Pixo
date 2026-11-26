@@ -188,24 +188,24 @@ namespace Pixo.Render
         /// estado (mix 0 → 1), para a troca não dar tranco.
         /// </summary>
         public static void PetsDuo(DrawingContext dc, string state, double pos, double x, double y, bool cushion = true,
-                                   string from = null, double fromPos = 0, double mix = 1)
+                                   string from = null, double fromPos = 0, double mix = 1, PetScene scene = null)
         {
             // 1:1, mas sem suavização por garantia (pixel art tem que ficar nítida)
             var group = new DrawingGroup();
             RenderOptions.SetBitmapScalingMode(group, BitmapScalingMode.NearestNeighbor);
-            group.Children.Add(new ImageDrawing(PetsBitmap(state, pos, cushion, from, fromPos, mix), new Rect(x, y, Pets.ScreenW, Pets.ScreenH)));
+            group.Children.Add(new ImageDrawing(PetsBitmap(state, pos, cushion, from, fromPos, mix, scene), new Rect(x, y, Pets.ScreenW, Pets.ScreenH)));
             dc.DrawDrawing(group);
         }
 
         /// <summary>A dupla numa imagem 360×216 que é reaproveitada (não guarde a referência entre quadros).</summary>
-        public static WriteableBitmap PetsBitmap(string state, double pos, bool cushion = true, string from = null, double fromPos = 0, double mix = 1)
+        public static WriteableBitmap PetsBitmap(string state, double pos, bool cushion = true, string from = null, double fromPos = 0, double mix = 1, PetScene scene = null)
         {
             if (_petsBuf == null || _petsBuf.Length != Pets.ScreenW * Pets.ScreenH)
             {
                 _petsBuf = new uint[Pets.ScreenW * Pets.ScreenH];
                 _petsBmp = new WriteableBitmap(Pets.ScreenW, Pets.ScreenH, 96, 96, PixelFormats.Bgra32, null);
             }
-            Pets.RenderDuoScreen(state, pos, from, fromPos, mix, _petsBuf, cushion);
+            Pets.RenderDuoScreen(state, pos, from, fromPos, mix, _petsBuf, cushion, scene);
             _petsBmp.WritePixels(new Int32Rect(0, 0, Pets.ScreenW, Pets.ScreenH), _petsBuf, Pets.ScreenW * 4, 0);
             return _petsBmp;
         }

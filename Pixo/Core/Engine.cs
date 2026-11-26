@@ -89,8 +89,9 @@ namespace Pixo.Core
             _focus = new AppFocus(() => _cfg);
 
             HealthService.NewWarning += text => Post("saude-aviso:" + text);
-            NotificationService.NewArrived += () => (_screens["bichinho"] as PetScreen)?.React("susto");
-            DownloadService.Finished += () => (_screens["bichinho"] as PetScreen)?.React("comemora");
+            // o passarinho traz a notificação e a entrega traz o download; a dupla reage quando eles pousam
+            NotificationService.NewArrived += () => (_screens["bichinho"] as PetScreen)?.Visit("passarinho");
+            DownloadService.Finished += () => (_screens["bichinho"] as PetScreen)?.Visit("entrega");
 
             // prioridade acima do normal: com o PC carregado (jogos, renderização), o Windows
             // não pausa o envio para a tela no meio de um quadro
@@ -313,6 +314,13 @@ namespace Pixo.Core
                     var st = a.Substring(10);
                     if (st == "ao-vivo") Pet?.StopPreview();
                     else { Pet?.Preview(st, 30); ShowPetsForAWhile(30); }
+                    continue;
+                }
+                if (a.StartsWith("cena:"))
+                {
+                    // teste de cena: "cena:natal", "cena:chuva", "cena:passarinho"... por 30 s
+                    Pet?.PreviewScene(a.Substring(5), 30);
+                    ShowPetsForAWhile(30);
                     continue;
                 }
                 if (a.StartsWith("saude-aviso:"))

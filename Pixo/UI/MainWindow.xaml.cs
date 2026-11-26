@@ -115,6 +115,9 @@ namespace Pixo.UI
             PetStateBox.Items.Add("Ao vivo (humor de agora)");
             foreach (var kv in Pets.States) PetStateBox.Items.Add(kv.Value.Name);
             PetStateBox.SelectedIndex = 0;
+            PetSceneBox.Items.Add("Ao vivo (clima e data de hoje)");
+            foreach (var sc in PetScreen.SceneChoices) PetSceneBox.Items.Add(sc.Name);
+            PetSceneBox.SelectedIndex = 0;
 
             // Voz
             ActionColumn.ItemsSource = ScreenInfo.VoiceActions.Select(a => new ActionOption { Id = a.Id, Name = a.Name }).ToList();
@@ -214,7 +217,9 @@ namespace Pixo.UI
                 // desenha "entre poses", como no display
                 bool hold = !info.Loop && _petFrame == info.Durations.Length - 1;
                 double t = hold ? 0 : Math.Clamp((DateTime.Now - _petStart).TotalMilliseconds / info.Durations[_petFrame], 0, 0.999);
-                PetPreview.Source = Images.PetsFrame(_petPreviewState, _petFrame + t);
+                string sceneKind = PetSceneBox.SelectedIndex <= 0 ? null : PetScreen.SceneChoices[PetSceneBox.SelectedIndex - 1].Id;
+                var scene = PetScreen.SceneFor(sceneKind, _cfg, (DateTime.Now - _petSceneStart).TotalSeconds);
+                PetPreview.Source = Images.PetsFrame(_petPreviewState, _petFrame + t, scene);
             }
 
             // textos de situação (clima, ar, API): 1 vez por segundo basta
@@ -596,6 +601,21 @@ namespace Pixo.UI
         }
 
         // ---------------- Bichinho ----------------
+
+        private DateTime _petSceneStart = DateTime.Now;
+
+        private void OnPetSceneChanged(object sender, SelectionChangedEventArgs e)
+        {
+            _petSceneStart = DateTime.Now; // a visita escolhida começa do início
+            if (PetSceneButton != null) PetSceneButton.IsEnabled = PetSceneBox.SelectedIndex > 0;
+        }
+
+        private void OnPetSceneOnScreen(object sender, RoutedEventArgs e)
+        {
+            if (PetSceneBox.SelectedIndex <= 0) return;
+            App.Engine.Post("cena:" + PetScreen.SceneChoices[PetSceneBox.SelectedIndex - 1].Id);
+            PetPreviewHint.Text = "Cena na tela por 30 s";
+        }
 
         private void OnPetStateChanged(object sender, SelectionChangedEventArgs e)
         {
